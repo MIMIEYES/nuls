@@ -94,7 +94,7 @@ public class DistributedBlockDownloadUtils {
             return;
         }
         Result result = checkHash();
-        if (result.isFaild()) {
+        if (result.isFailed()) {
             return;
         }
         for (long i = 0; i <= (endHeight - startHeight); i++) {
@@ -124,9 +124,9 @@ public class DistributedBlockDownloadUtils {
             } catch (InterruptedException e) {
                 Log.error(e);
             }
-            return Result.getFaildResult("");
+            return Result.getFailed("");
         }
-        return Result.getSuccessResult();
+        return Result.getSuccess();
     }
 
     private void finished() {

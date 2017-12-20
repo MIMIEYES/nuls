@@ -25,6 +25,7 @@ import io.nuls.consensus.service.impl.BlockServiceImpl;
 import io.nuls.consensus.service.impl.PocConsensusServiceImpl;
 import io.nuls.consensus.service.intf.ConsensusService;
 import io.nuls.consensus.thread.BlockMaintenanceThread;
+import io.nuls.consensus.thread.BlockPersistenceThread;
 import io.nuls.consensus.thread.ConsensusMeetingThread;
 import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.context.NulsContext;
@@ -82,7 +83,7 @@ public class PocConsensusModuleImpl extends AbstractConsensusModule {
         this.startBlockMaintenanceThread();
         this.checkConsensusStatus();
         this.checkPeerType();
-
+        ThreadManager.createSingleThreadAndRun(this.getModuleId(), BlockPersistenceThread.THREAD_NAME, BlockPersistenceThread.getInstance());
         this.registerHanders();
         Log.info("the POC consensus module is started!");
 
@@ -170,15 +171,12 @@ public class PocConsensusModuleImpl extends AbstractConsensusModule {
             startMining();
             return;
         }
-        int i = consensusCacheService.getDelegateAccountCount();
-        if (i <= PocConsensusConstant.SAFELY_CONSENSUS_COUNT) {
-            Map<String, Object> paramsMap = new HashMap<>();
-            paramsMap.put(JoinConsensusParam.IS_SEED_PEER, true);
-            paramsMap.put(JoinConsensusParam.AGENT_ADDRESS, localAccount.getAddress().toString());
-            paramsMap.put(JoinConsensusParam.DEPOSIT, 0L);
-            paramsMap.put(JoinConsensusParam.INTRODUCTION, "seed peer!");
-            this.pocConsensusService.joinTheConsensus(localAccount.getAddress().toString(), null, paramsMap);
-        }
+        Map<String, Object> paramsMap = new HashMap<>();
+        paramsMap.put(JoinConsensusParam.IS_SEED_PEER, true);
+        paramsMap.put(JoinConsensusParam.AGENT_ADDRESS, localAccount.getAddress().toString());
+        paramsMap.put(JoinConsensusParam.DEPOSIT, 0L);
+        paramsMap.put(JoinConsensusParam.INTRODUCTION, "seed peer!");
+        this.pocConsensusService.joinTheConsensus(localAccount.getAddress().toString(), null, paramsMap);
     }
 
     private void startMining() {
