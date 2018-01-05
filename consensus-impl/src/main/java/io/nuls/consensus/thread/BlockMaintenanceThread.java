@@ -9,10 +9,11 @@ import io.nuls.consensus.utils.DistributedBlockDownloadUtils;
 import io.nuls.core.chain.entity.Block;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.context.NulsContext;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.date.TimeService;
 import io.nuls.core.utils.log.Log;
-import io.nuls.event.bus.event.service.intf.EventService;
+import io.nuls.event.bus.service.intf.NetworkEventBroadcaster;
 
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class BlockMaintenanceThread implements Runnable {
 
     private final BlockService blockService = BlockServiceImpl.getInstance();
 
-    private final EventService eventService = NulsContext.getInstance().getService(EventService.class);
+    private final NetworkEventBroadcaster networkEventBroadcaster = NulsContext.getInstance().getService(NetworkEventBroadcaster.class);
 
     public static synchronized BlockMaintenanceThread getInstance() {
         if (instance == null) {
@@ -66,7 +67,7 @@ public class BlockMaintenanceThread implements Runnable {
         do {
             if (null == localBestBlock) {
                 doit = true;
-                blockInfo = BEST_HEIGHT_FROM_NET.request(0);
+                blockInfo = BEST_HEIGHT_FROM_NET.request(-1);
                 break;
             }
             startHeight = localBestBlock.getHeader().getHeight() + 1;
@@ -80,7 +81,7 @@ public class BlockMaintenanceThread implements Runnable {
                 }
                 break;
             }
-            blockInfo = BEST_HEIGHT_FROM_NET.request(0);
+            blockInfo = BEST_HEIGHT_FROM_NET.request(-1);
             if (blockInfo.getHeight() > localBestBlock.getHeader().getHeight()) {
                 doit = true;
                 break;
@@ -120,7 +121,7 @@ public class BlockMaintenanceThread implements Runnable {
     }
 
     private Block getLocalBestCorrectBlock() {
-        Block localBestBlock = this.blockService.getLocalHighestBlock();
+        Block localBestBlock = this.blockService.getLocalBestBlock();
         do {
             if (null == localBestBlock || localBestBlock.getHeader().getHeight() <= 1) {
                 break;
@@ -129,13 +130,13 @@ public class BlockMaintenanceThread implements Runnable {
             if (null == blockInfo || blockInfo.getHash() == null) {
                 //本地高度最高，查询网络最新高度，并回退
                 rollbackBlock(localBestBlock.getHeader().getHeight());
-                localBestBlock = this.blockService.getLocalHighestBlock();
+                localBestBlock = this.blockService.getLocalBestBlock();
                 break;
             }
             if (!blockInfo.getHash().equals(localBestBlock.getHeader().getHash())) {
                 //本地分叉，回退
                 rollbackBlock(blockInfo.getHeight());
-                localBestBlock = this.blockService.getLocalHighestBlock();
+                localBestBlock = this.blockService.getLocalBestBlock();
                 break;
             }
         } while (false);
@@ -143,7 +144,12 @@ public class BlockMaintenanceThread implements Runnable {
     }
 
     private void rollbackBlock(long startHeight) {
-        this.blockService.rollback(startHeight);
+        try {
+            this.blockService.rollback(startHeight);
+        } catch (NulsException e) {
+            Log.error(e);
+            return;
+        }
         long height = startHeight - 1;
         if (height < 1) {
             throw new NulsRuntimeException(ErrorCode.NET_MESSAGE_ERROR, "Block data error!");

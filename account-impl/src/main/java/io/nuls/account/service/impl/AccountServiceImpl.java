@@ -8,7 +8,11 @@ import io.nuls.account.entity.tx.AliasTransaction;
 import io.nuls.account.manager.AccountManager;
 import io.nuls.account.service.intf.AccountService;
 import io.nuls.account.util.AccountTool;
-import io.nuls.core.chain.entity.*;
+import io.nuls.core.chain.entity.NulsDigestData;
+import io.nuls.core.chain.entity.NulsSignData;
+import io.nuls.core.chain.entity.Result;
+import io.nuls.core.chain.entity.Transaction;
+import io.nuls.core.chain.manager.TransactionManager;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.context.NulsContext;
@@ -20,18 +24,24 @@ import io.nuls.core.thread.manager.ThreadManager;
 import io.nuls.core.utils.crypto.Hex;
 import io.nuls.core.utils.date.DateUtil;
 import io.nuls.core.utils.date.TimeService;
+import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.param.AssertUtil;
 import io.nuls.core.utils.str.StringUtils;
 import io.nuls.db.dao.AccountDao;
+import io.nuls.db.dao.AccountTxDao;
 import io.nuls.db.dao.AliasDao;
 import io.nuls.db.entity.AccountPo;
 import io.nuls.db.entity.AliasPo;
-import io.nuls.event.bus.event.service.intf.EventService;
-import io.nuls.ledger.entity.tx.LockNulsTransaction;
+import io.nuls.db.entity.TransactionLocalPo;
+import io.nuls.db.entity.TransactionPo;
+import io.nuls.db.util.TransactionPoTool;
+import io.nuls.event.bus.service.intf.NetworkEventBroadcaster;
+import io.nuls.ledger.entity.params.CoinTransferData;
 import io.nuls.ledger.service.intf.LedgerService;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,11 +64,13 @@ public class AccountServiceImpl implements AccountService {
 
     private AccountDao accountDao = NulsContext.getInstance().getService(AccountDao.class);
 
+    private AccountTxDao accountTxDao = NulsContext.getInstance().getService(AccountTxDao.class);
+
     private AliasDao aliasDao = NulsContext.getInstance().getService(AliasDao.class);
 
     private LedgerService ledgerService = NulsContext.getInstance().getService(LedgerService.class);
 
-    private EventService eventService = NulsContext.getInstance().getService(EventService.class);
+    private NetworkEventBroadcaster networkEventBroadcaster = NulsContext.getInstance().getService(NetworkEventBroadcaster.class);
 
     private boolean isLockNow = true;
 
@@ -230,6 +242,7 @@ public class AccountServiceImpl implements AccountService {
         } else {
             throw new NulsRuntimeException(ErrorCode.FAILED, "The account not exist,id:" + id);
         }
+        //todo 发送notice给其他模块
     }
 
     @Override
@@ -371,10 +384,8 @@ public class AccountServiceImpl implements AccountService {
                 resetKeys(password);
             }
         });
-
         return new Result(true, "OK");
     }
-
 
     @Override
     public NulsSignData signData(byte[] bytes) {
@@ -439,11 +450,11 @@ public class AccountServiceImpl implements AccountService {
     public Result setAlias(String address, String alias) {
         try {
             Result result = canSetAlias(address, alias);
-            if (result.isFailed()) {
+            if (null == result || result.isFailed()) {
                 return result;
             }
             Account account = getAccount(address);
-            result = accountDao.setAlias(address, alias);
+            result = accountTxDao.setAlias(address, alias);
             account.setAlias(alias);
             accountCacheService.putAccount(account);
             return result;
@@ -455,21 +466,19 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public Result sendAliasTx(String address, String password, String alias) {
         Result result = canSetAlias(address, alias);
-        if (result.isFailed()) {
+        if (null == result || result.isFailed()) {
             return result;
         }
-
         try {
             Account account = getAccount(address);
             AliasEvent event = new AliasEvent();
-            AliasTransaction aliasTx = new AliasTransaction(address, alias);
-            LockNulsTransaction nulsTx = ledgerService.createLockNulsTx(account.getAddress().getBase58(), password, AccountConstant.ALIAS_Na);
-            aliasTx.setNulsTx(nulsTx);
+            CoinTransferData coinData = new CoinTransferData(AccountConstant.ALIAS_NA, address, null);
+            AliasTransaction aliasTx = new AliasTransaction(coinData, password);
             aliasTx.setHash(NulsDigestData.calcDigestData(aliasTx.serialize()));
             aliasTx.setSign(signData(aliasTx.getHash(), account, password));
-            ledgerService.cacheTx(aliasTx);
+            ledgerService.verifyAndCacheTx(aliasTx);
             event.setEventBody(aliasTx);
-            eventService.broadcastHashAndCache(event);
+            networkEventBroadcaster.broadcastAndCache(event);
         } catch (Exception e) {
             Log.error(e);
             return new Result(false, e.getMessage());
@@ -495,40 +504,47 @@ public class AccountServiceImpl implements AccountService {
         if (!result.isSuccess()) {
             return result;
         }
-        return export(account, (File) result.getObject(), true);
+        return exportAccount(account, (File) result.getObject());
     }
 
-    private Result export(Account account, File backupFile, boolean writeLength) {
-        List<Transaction> txList = ledgerService.queryListByAccount(account.getAddress().getBase58(), 0, 0);
-        FileOutputStream fos = null;
-        try {
-            fos = new FileOutputStream(backupFile);
-            if (writeLength) {
-                fos.write(1);   //account length
-            }
-            fos.write(account.serialize());
-            fos.write(new VarInt(txList.size()).encode());
-
-            Transaction tx;
-            for (int i = 0; i < txList.size(); i++) {
-                tx = txList.get(i);
-                fos.write(tx.serialize());
-            }
-        } catch (IOException e) {
-            Log.error(e);
-            return new Result(false, "export failed");
-        } finally {
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+    @Override
+    public Result exportAccount(String address, String filePath) {
+        if (StringUtils.isBlank(filePath)) {
+            return new Result(false, "filePath is required");
         }
-        return new Result(true, "OK");
+        if (StringUtils.isBlank(address)) {
+            return new Result(false, "address is required");
+        }
+        Account account = getAccount(address);
+        if (account == null) {
+            return new Result(false, "account not found");
+        }
+
+        Result result = backUpFile(filePath);
+        if (!result.isSuccess()) {
+            return result;
+        }
+        return exportAccount(account, (File) result.getObject());
     }
 
+    @Override
+    public Result exportAccounts(String filePath) {
+        if (StringUtils.isBlank(filePath)) {
+            return new Result(false, "filePath is required");
+        }
+        List<Account> accounts = getLocalAccountList();
+        if (accounts == null || accounts.isEmpty()) {
+            return new Result(false, "no account can export");
+        }
+        if (accounts.size() == 1) {
+            return exportAccount(accounts.get(0).getAddress().getBase58(), filePath);
+        }
+        Result result = backUpFile(filePath);
+        if (!result.isSuccess()) {
+            return result;
+        }
+        return exportAccounts(accounts, (File) result.getObject());
+    }
 
     private Result<File> backUpFile(String filePath) {
         File backupFile = new File(filePath);
@@ -552,42 +568,158 @@ public class AccountServiceImpl implements AccountService {
             Log.error(e);
             return new Result(false, "create file failed");
         }
+
         return new Result<>(true, "OK", backupFile);
     }
 
-    @Override
-    public Result exportAccount(String address, String filePath) {
-        if (StringUtils.isBlank(filePath)) {
-            return new Result(false, "filePath is required");
-        }
-        if (StringUtils.isBlank(address)) {
-            return new Result(false, "address is required");
-        }
-        Account account = getAccount(address);
-        if (account == null) {
-            return new Result(false, "account not found");
-        }
+    private Result exportAccount(Account account, File backupFile) {
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(backupFile);
+            fos.write(1);   //account length
+            fos.write(account.serialize());
 
-        Result result = backUpFile(filePath);
-        if (!result.isSuccess()) {
-            return result;
+            List<TransactionPo> txList = ledgerService.queryPoListByAccount(account.getAddress().getBase58(), 0, 0);
+            fos.write(new VarInt(txList.size()).encode());
+
+            TransactionPo tx;
+            for (int i = 0; i < txList.size(); i++) {
+                tx = txList.get(i);
+                fos.write(tx.getTxdata());
+            }
+        } catch (Exception e) {
+            Log.error(e);
+            return new Result(false, "export failed");
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
-        return export(account, (File) result.getObject(), true);
+        return new Result(true, "OK");
+    }
+
+    private Result exportAccounts(List<Account> accounts, File backupFile) {
+        FileOutputStream fos = null;
+        List<TransactionPo> txList;
+        TransactionPo tx;
+        try {
+            fos = new FileOutputStream(backupFile);
+            fos.write(new VarInt(accounts.size()).encode());   //account length
+
+            for (Account account : accounts) {
+                fos.write(account.serialize());
+                txList = ledgerService.queryPoListByAccount(account.getAddress().getBase58(), 0, 0);
+                fos.write(new VarInt(txList.size()).encode());
+
+                for (int i = 0; i < txList.size(); i++) {
+                    tx = txList.get(i);
+                    fos.write(tx.getTxdata());
+                }
+            }
+        } catch (Exception e) {
+            Log.error(e);
+            return new Result(false, "export failed");
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+
+                }
+            }
+        }
+        return new Result(true, "OK");
     }
 
     @Override
-    public Result exportAccounts(String filePath) {
-        if (StringUtils.isBlank(filePath)) {
-            return new Result(false, "filePath is required");
+    public Result importAccountsFile(String walletFilePath) {
+        if (StringUtils.isBlank(walletFilePath)) {
+            return new Result(false, "walletFilePath is required");
+        }
+        File walletFile = new File(walletFilePath);
+        if (!walletFile.exists()) {
+            return new Result(false, "file not found");
         }
 
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(walletFile);
+            byte[] datas = new byte[fis.available()];
+            fis.read(datas);
+
+            NulsByteBuffer buffer = new NulsByteBuffer(datas);
+            int accountSize = (int) buffer.readVarInt();
+            List<Account> accounts = new ArrayList<>();
+
+            for (int i = 0; i < accountSize; i++) {
+                Account account = new Account(buffer);
+                if (accountExsit(account)) {
+                    continue;
+                }
+                int txSize = (int) buffer.readVarInt();
+                List<Transaction> txList = new ArrayList<>();
+                for (int j = 0; j < txSize; j++) {
+                    Transaction tx = TransactionManager.getInstance(buffer);
+                    txList.add(tx);
+                }
+                account.setMyTxs(txList);
+                accounts.add(account);
+            }
+
+            //save database
+            importSave(accounts);
+
+            for (Account account : accounts) {
+                accountCacheService.putAccount(account);
+            }
+        } catch (Exception e) {
+            Log.error(e);
+            return new Result(false, "import failed, file is broken");
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return new Result(true, "OK");
+    }
+
+    private boolean accountExsit(Account account) {
         List<Account> accounts = getLocalAccountList();
-        if (accounts == null || accounts.isEmpty()) {
-            return new Result(false, "no account can export");
+        if (accounts.isEmpty()) {
+            return true;
         }
-        if (accounts.size() == 1) {
-
+        for (Account acct : accounts) {
+            if (account.getId().equals(acct.getId())) {
+                return false;
+            }
         }
-        return null;
+        return true;
     }
+
+    private void importSave(List<Account> accounts) throws Exception {
+        List<AccountPo> accountPoList = new ArrayList<>();
+
+        for (Account account : accounts) {
+            AccountPo accountPo = new AccountPo();
+            AccountTool.toPojo(account, accountPo);
+
+            List<TransactionLocalPo> transactionPos = new ArrayList<>();
+            for (Transaction tx : account.getMyTxs()) {
+                TransactionLocalPo po = TransactionPoTool.toPojoLocal(tx);
+                transactionPos.add(po);
+            }
+            accountPo.setMyTxs(transactionPos);
+            accountPoList.add(accountPo);
+        }
+        accountTxDao.importAccount(accountPoList);
+    }
+
 }

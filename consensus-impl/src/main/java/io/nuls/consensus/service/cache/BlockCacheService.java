@@ -18,7 +18,12 @@ public class BlockCacheService {
     private long minHeight;
     private long maxHeight;
 
+
     private BlockCacheService() {
+
+    }
+
+    public void init() {
         blockCacheMap = new CacheMap<>(BLOCK_CACHE);
         hashHeightMap = new CacheMap<>(HEIGHT_HASH_CACHE);
     }
@@ -27,6 +32,7 @@ public class BlockCacheService {
         return INSTANCE;
     }
 
+    //todo 分叉处理
     public void cacheBlock(Block block) {
         if (block.getHeader().getHeight() == (1 + maxHeight)) {
             maxHeight = block.getHeader().getHeight();
@@ -66,11 +72,24 @@ public class BlockCacheService {
         this.maxHeight = maxHeight;
     }
 
-    public Block earliestBlockAndRemove() {
-        Block block = blockCacheMap.get(minHeight);
+
+    public Block getBlock(long height) {
+        return blockCacheMap.get(height);
+    }
+
+    public Block getBlock(String hash) {
+        long height = hashHeightMap.get(hash);
+        return getBlock(height);
+    }
+
+    public void removeBlock(long height) {
+        Block block = blockCacheMap.get(height);
         blockCacheMap.remove(minHeight);
         hashHeightMap.remove(block.getHeader().getHash().getDigestHex());
         minHeight++;
-        return block;
+    }
+
+    public Block getMinHeightCacheBlock() {
+        return getBlock(getMinHeight());
     }
 }

@@ -4,6 +4,7 @@ import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.chain.entity.Na;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.crypto.VarInt;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
@@ -19,7 +20,7 @@ import java.io.UnsupportedEncodingException;
 public class Delegate extends BaseNulsData {
     private Na deposit;
     private String delegateAddress;
-
+    private int status;
     private long startTime;
     private String id;
 
@@ -62,13 +63,13 @@ public class Delegate extends BaseNulsData {
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer buffer) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer buffer) throws IOException {
         buffer.writeVarInt(deposit.getValue());
         buffer.writeString(delegateAddress);
     }
 
     @Override
-    public void parse(NulsByteBuffer byteBuffer) {
+    protected void parse(NulsByteBuffer byteBuffer) throws NulsException {
         this.deposit = Na.valueOf(byteBuffer.readVarInt());
         this.delegateAddress = byteBuffer.readString();
     }
@@ -79,5 +80,13 @@ public class Delegate extends BaseNulsData {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
     }
 }

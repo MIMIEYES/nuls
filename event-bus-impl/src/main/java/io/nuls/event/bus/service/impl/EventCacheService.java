@@ -2,7 +2,7 @@ package io.nuls.event.bus.service.impl;
 
 import io.nuls.cache.service.intf.CacheService;
 import io.nuls.core.context.NulsContext;
-import io.nuls.core.event.BaseNulsEvent;
+import io.nuls.core.event.BaseNetworkEvent;
 
 /**
  * @author Niels
@@ -13,9 +13,12 @@ public class EventCacheService {
     private static final String CACHE_OF_SENDED = "event-cache-sended";
     private static final String CACHE_OF_RECIEVED = "event-cache-recieved";
     private static final int TIME_OF_IDLE_SECONDS = 60;
-    private final CacheService cacheService;
+    private CacheService cacheService;
 
     private EventCacheService() {
+    }
+
+    public void init(){
         this.cacheService = NulsContext.getInstance().getService(CacheService.class);
         this.cacheService.createCache(CACHE_OF_SENDED, 0, TIME_OF_IDLE_SECONDS);
         this.cacheService.createCache(CACHE_OF_RECIEVED, 0, TIME_OF_IDLE_SECONDS);
@@ -25,7 +28,7 @@ public class EventCacheService {
         return INSTANCE;
     }
 
-    public void cacheSendedEvent(BaseNulsEvent event) {
+    public void cacheSendedEvent(BaseNetworkEvent event) {
         this.cacheService.putElement(CACHE_OF_SENDED, event.getHash().getDigestHex(), event);
     }
 
@@ -38,7 +41,12 @@ public class EventCacheService {
                 this.cacheService.containsKey(CACHE_OF_SENDED, hashHex);
     }
 
-    public BaseNulsEvent getEvent(String hashHex) {
-        return (BaseNulsEvent) this.cacheService.getElementValue(CACHE_OF_SENDED, hashHex);
+    public BaseNetworkEvent getEvent(String hashHex) {
+        return (BaseNetworkEvent) this.cacheService.getElementValue(CACHE_OF_SENDED, hashHex);
+    }
+
+    public void destroy() {
+        this.cacheService.removeCache(CACHE_OF_SENDED);
+        this.cacheService.removeCache(CACHE_OF_RECIEVED);
     }
 }

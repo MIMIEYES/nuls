@@ -20,13 +20,18 @@ import java.io.InputStream;
 import java.sql.SQLException;
 
 /**
- *
  * @author vivi
  * @date 2017/9/27
  */
 public class MybatisDBModuleImpl extends AbstractDBModule {
 
     private SqlSessionFactory sqlSessionFactory;
+
+    @Override
+    public void init() {
+        // todo auto-generated method stub(niels)
+
+    }
 
     @Override
     public void start() {
@@ -51,9 +56,9 @@ public class MybatisDBModuleImpl extends AbstractDBModule {
 
     private void initService() {
         DBMethodFilter dbMethodFilter = new DBMethodFilter();
-        this.registerService(BlockDao.class,AopUtils.createProxy(BlockDaoImpl.class, dbMethodFilter));
-        this.registerService(AliasDao.class,AopUtils.createProxy(AliasDaoImpl.class, dbMethodFilter));
-        this.registerService(AccountDao.class,AopUtils.createProxy(AccountDaoImpl.class, dbMethodFilter));
+        this.registerService(BlockDao.class, AopUtils.createProxy(BlockDaoImpl.class, dbMethodFilter));
+        this.registerService(AliasDao.class, AopUtils.createProxy(AliasDaoImpl.class, dbMethodFilter));
+        this.registerService(AccountDao.class, AopUtils.createProxy(AccountDaoImpl.class, dbMethodFilter));
         this.registerService(DelegateDao.class, AopUtils.createProxy(DelegateDaoImpl.class, dbMethodFilter));
         this.registerService(DelegateAccountDao.class, AopUtils.createProxy(DelegateAccountDaoImpl.class, dbMethodFilter));
         this.registerService(PeerDao.class, AopUtils.createProxy(PeerDaoImpl.class, dbMethodFilter));
@@ -65,6 +70,9 @@ public class MybatisDBModuleImpl extends AbstractDBModule {
         this.registerService(UtxoOutputDao.class, AopUtils.createProxy(UtxoOutputDaoImpl.class, dbMethodFilter));
         this.registerService(UtxoInputDao.class, AopUtils.createProxy(UtxoInputDaoImpl.class, dbMethodFilter));
         this.registerService(SubChainDao.class, AopUtils.createProxy(SubChainDaoImpl.class, dbMethodFilter));
+        this.registerService(ConsensusDao.class, AopUtils.createProxy(ConsensusDaoImpl.class, dbMethodFilter));
+        this.registerService(AccountTxDao.class, AopUtils.createProxy(AccountTxDaoImpl.class, dbMethodFilter));
+        this.registerService(UtxoTransactionDao.class, AopUtils.createProxy(UtxoTransactionDaoImpl.class, dbMethodFilter));
     }
 
     @Override

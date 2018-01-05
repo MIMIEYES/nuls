@@ -2,11 +2,9 @@ package io.nuls.core.utils.crypto;
 
 import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.constant.ErrorCode;
-import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.crypto.Sha256Hash;
 import io.nuls.core.crypto.VarInt;
-import io.nuls.core.event.BaseNulsEvent;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.log.Log;
 import org.spongycastle.crypto.digests.RIPEMD160Digest;
@@ -476,6 +474,16 @@ public class Utils {
             return 1;
         } else if (val instanceof byte[]) {
             return VarInt.sizeOf(((byte[]) val).length) + ((byte[]) val).length;
+        } else if (val instanceof BaseNulsData) {
+            int size = ((BaseNulsData) val).size();
+            return size == 0 ? 1 : size;
+        } else if (val instanceof List) {
+            List list = (List) val;
+            int size = VarInt.sizeOf(list.size());
+            for (Object o : list) {
+                size += sizeOfSerialize(o);
+            }
+            return size;
         }
         throw new NulsRuntimeException(ErrorCode.DATA_ERROR, "instance of unkown");
     }

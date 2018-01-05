@@ -1,7 +1,7 @@
 package io.nuls.core.thread.manager;
 
 import io.nuls.core.thread.BaseThread;
-import io.nuls.core.thread.cache.ThreadData;
+import io.nuls.core.thread.cache.TaskManager;
 import io.nuls.core.utils.aop.AopUtils;
 
 import java.util.List;
@@ -14,7 +14,7 @@ public class ThreadManager {
     private static final int DEFAULT_QUEUE_MAX_SIZE = Integer.MAX_VALUE;
 
 
-    private static final ThreadData THREAD_DATA_CACHE = ThreadData.getInstance();
+    private static final TaskManager THREAD_DATA_CACHE = TaskManager.getInstance();
 
     private static final String TEMPORARY_THREAD_POOL_NAME = "temporary";
     private static final int TEMPORARY_THREAD_POOL_COUNT = 10;
@@ -83,16 +83,6 @@ public class ThreadManager {
 
     public static final List<BaseThread> getThreadList(short moduleId) {
         return THREAD_DATA_CACHE.getThreadList(moduleId);
-    }
-
-    public static final String getThreadPoolsInfoString(short moduleId) {
-        //todo
-        return null;
-    }
-
-    public static final Thread.State getThreadStateByName(String name) {
-        //todo
-        return null;
     }
 
     public static void shutdownByModuleId(short moduleId) {

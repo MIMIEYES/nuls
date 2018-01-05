@@ -1,13 +1,12 @@
 package io.nuls.core.chain.entity;
 
 
-import io.nuls.core.utils.crypto.Utils;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
  * Nuls unit
+ *
  * @author Niels
  */
 public final class Na implements Comparable<Na>, Serializable {
@@ -85,6 +84,10 @@ public final class Na implements Comparable<Na>, Serializable {
         } catch (ArithmeticException e) {
             throw new IllegalArgumentException(e);
         }
+    }
+
+    public double toDouble() {
+        return new BigDecimal(this.value).movePointLeft(SMALLEST_UNIT_EXPONENT).toBigIntegerExact().doubleValue();
     }
 
     public Na add(final Na value) {

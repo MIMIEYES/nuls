@@ -10,8 +10,9 @@ import io.nuls.account.manager.AccountManager;
 import io.nuls.account.module.intf.AbstractAccountModule;
 import io.nuls.account.service.impl.AccountServiceImpl;
 import io.nuls.account.service.intf.AccountService;
+import io.nuls.core.constant.TransactionConstant;
 import io.nuls.core.context.NulsContext;
-import io.nuls.event.bus.processor.service.intf.NetworkProcessorService;
+import io.nuls.event.bus.processor.service.intf.NetworkEventProcessorService;
 import io.nuls.ledger.service.intf.LedgerService;
 import io.nuls.network.service.NetworkService;
 
@@ -22,17 +23,20 @@ import io.nuls.network.service.NetworkService;
 public class AccountModuleImpl extends AbstractAccountModule {
 
     private AccountManager manager = AccountManager.getInstance();
-    private NetworkProcessorService processorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
+    private NetworkEventProcessorService processorService = NulsContext.getInstance().getService(NetworkEventProcessorService.class);
+
+    @Override
+    public void init() {
+        this.publish(AccountConstant.EVENT_TYPE_ALIAS, AliasEvent.class);
+        this.registerTransaction(TransactionConstant.TX_TYPE_SET_ALIAS, AliasTransaction.class);
+    }
 
     @Override
     public void start() {
-        manager.init();
         AccountService accountService = AccountServiceImpl.getInstance();
         this.registerService(accountService);
-        this.registerTransaction(AccountConstant.TX_TYPE_ALIAS, AliasTransaction.class);
-        this.registerEvent(AccountConstant.EVENT_TYPE_ALIAS, AliasEvent.class);
         AliasValidator.getInstance().setAccountService(accountService);
-
+        manager.init();
         registerHanders();
     }
 
@@ -41,7 +45,6 @@ public class AccountModuleImpl extends AbstractAccountModule {
         LedgerService ledgerService = NulsContext.getInstance().getService(LedgerService.class);
 
         AliasEventHandler.getInstance().addFilter(AliasEventFilter.getInstance());
-        AliasEventHandler.getInstance().setNetworkService(service);
         AliasEventHandler.getInstance().setLedgerService(ledgerService);
         processorService.registerEventHandler(AliasEvent.class, AliasEventHandler.getInstance());
     }

@@ -2,23 +2,22 @@ package io.nuls.core.constant;
 
 /**
  * SYSTEM CONSTANT
+ *
  * @author Niels
  * @date 2017/9/26
  */
 public interface NulsConstant {
+    byte PLACE_HOLDER = (byte) 0xFF;
 
     String USER_CONFIG_FILE = "nuls.ini";
     String SYSTEM_CONFIG_FILE = "sys.properties";
 
-    /**----[ System] ----*/
+    /**
+     * ----[ System] ----
+     */
     String CFG_SYSTEM_SECTION = "System";
     String CFG_SYSTEM_LANGUAGE = "language";
     String CFG_SYSTEM_DEFAULT_ENCODING = "encoding";
-    String CFG_SYSTEM_RUN_MODE = "run.mode";
-
-    String RUN_MODE_MAIN = "1";
-    String RUN_MODE_TEST = "2";
-    String RUN_MODE_DEV = "3";
 
     /**----[ Bootstrap] ----*/
 //    String CFG_BOOTSTRAP_RPC_SERVER_MODULE = "RPC";
@@ -29,7 +28,9 @@ public interface NulsConstant {
 //    String CFG_BOOTSTRAP_EVENT_BUS_MODULE = "EB";
 //    String CFG_BOOTSTRAP_CACHE_MODULE = "CACHE";
 
-    /**----[ Module Id] ----*/
+    /**
+     * ----[ Module Id] ----
+     */
     short MODULE_ID_MQ = 1;
     short MODULE_ID_DB = 2;
     short MODULE_ID_CACHE = 3;

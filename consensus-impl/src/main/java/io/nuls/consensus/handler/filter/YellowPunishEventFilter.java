@@ -1,8 +1,8 @@
 package io.nuls.consensus.handler.filter;
 
 import io.nuls.consensus.event.YellowPunishConsensusEvent;
-import io.nuls.event.bus.event.filter.NulsEventFilter;
-import io.nuls.event.bus.event.filter.NulsEventFilterChain;
+import io.nuls.event.bus.filter.NulsEventFilter;
+import io.nuls.event.bus.filter.NulsEventFilterChain;
 
 /**
  * @author Niels

@@ -3,17 +3,16 @@ package io.nuls.account.entity.event;
 import io.nuls.account.constant.AccountConstant;
 import io.nuls.account.entity.tx.AliasTransaction;
 import io.nuls.core.constant.NulsConstant;
-import io.nuls.core.event.BaseNulsEvent;
+import io.nuls.core.event.BaseNetworkEvent;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.log.Log;
-import io.nuls.core.validate.ValidateResult;
 
 /**
  * @author vivi
  * @date 2017/12/18.
  */
-public class AliasEvent extends BaseNulsEvent<AliasTransaction> {
+public class AliasEvent extends BaseNetworkEvent<AliasTransaction> {
     public AliasEvent() {
         super(NulsConstant.MODULE_ID_ACCOUNT, AccountConstant.EVENT_TYPE_ALIAS);
     }
@@ -29,12 +28,7 @@ public class AliasEvent extends BaseNulsEvent<AliasTransaction> {
     }
 
     @Override
-    protected AliasTransaction parseEventBody(NulsByteBuffer byteBuffer) {
-        try {
-            return new AliasTransaction(byteBuffer);
-        } catch (NulsException e) {
-            Log.error(e);
-            return null;
-        }
+    protected AliasTransaction parseEventBody(NulsByteBuffer byteBuffer) throws NulsException {
+        return byteBuffer.readNulsData(new AliasTransaction());
     }
 }

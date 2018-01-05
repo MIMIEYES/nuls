@@ -1,19 +1,17 @@
 package io.nuls.consensus.handler;
 
-import io.nuls.consensus.event.RedPunishConsensusEvent;
 import io.nuls.consensus.event.YellowPunishConsensusEvent;
-import io.nuls.core.exception.NulsException;
-import io.nuls.event.bus.event.handler.AbstractNetworkNulsEventHandler;
+import io.nuls.event.bus.handler.AbstractNetworkEventHandler;
 
 /**
  *
  * @author facjas
  * @date 2017/11/16
  */
-public class YellowPunishHandler extends AbstractNetworkNulsEventHandler<YellowPunishConsensusEvent> {
+public class YellowPunishHandler extends AbstractNetworkEventHandler<YellowPunishConsensusEvent> {
 
     @Override
-    public void onEvent(YellowPunishConsensusEvent event,String fromId) throws NulsException {
+    public void onEvent(YellowPunishConsensusEvent event,String fromId)  {
         //todo
 
     }

@@ -1,7 +1,7 @@
 package io.nuls.network.service.impl;
 
 import io.nuls.core.crypto.Sha256Hash;
-import io.nuls.core.event.BaseNulsEvent;
+import io.nuls.core.event.BaseNetworkEvent;
 import io.nuls.core.mesasge.NulsMessage;
 import io.nuls.core.mesasge.NulsMessageHeader;
 import io.nuls.core.utils.log.Log;
@@ -196,15 +196,15 @@ public class BroadcasterImpl implements Broadcaster {
 
 
     @Override
-    public BroadcastResult broadcast(BaseNulsEvent event) {
+    public BroadcastResult broadcast(BaseNetworkEvent event) {
         return broadcast(event, null);
     }
 
     @Override
-    public BroadcastResult broadcast(BaseNulsEvent event, String excludePeerId) {
+    public BroadcastResult broadcast(BaseNetworkEvent event, String excludePeerId) {
         NulsMessage message = null;
         try {
-            message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, event.serialize());
+            message = new NulsMessage(network.packetMagic(), event.serialize());
         } catch (IOException e) {
             return new BroadcastResult(false, "event.serialize() error");
         }
@@ -219,18 +219,18 @@ public class BroadcasterImpl implements Broadcaster {
 
     @Override
     public BroadcastResult broadcast(byte[] data, String excludePeerId) {
-        NulsMessage message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, data);
+        NulsMessage message = new NulsMessage(network.packetMagic(), data);
         return broadcast(message, excludePeerId);
     }
 
-    public BroadcastResult broadcastSync(BaseNulsEvent event) {
+    public BroadcastResult broadcastSync(BaseNetworkEvent event) {
         return broadcastSync(event, null);
     }
 
-    public BroadcastResult broadcastSync(BaseNulsEvent event, String excludePeerId) {
+    public BroadcastResult broadcastSync(BaseNetworkEvent event, String excludePeerId) {
         NulsMessage message = null;
         try {
-            message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, event.serialize());
+            message = new NulsMessage(network.packetMagic(), event.serialize());
         } catch (IOException e) {
             return new BroadcastResult(false, "event.serialize() error");
         }
@@ -243,15 +243,15 @@ public class BroadcasterImpl implements Broadcaster {
     }
 
     public BroadcastResult broadcastSync(byte[] data, String excludePeerId) {
-        NulsMessage message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, data);
+        NulsMessage message = new NulsMessage(network.packetMagic(), data);
         return broadcastSync(message, excludePeerId);
     }
 
     @Override
-    public BroadcastResult broadcastToPeer(BaseNulsEvent event, String peerId) {
+    public BroadcastResult broadcastToPeer(BaseNetworkEvent event, String peerId) {
         NulsMessage message = null;
         try {
-            message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, event.serialize());
+            message = new NulsMessage(network.packetMagic(), event.serialize());
         } catch (IOException e) {
             return new BroadcastResult(false, "event.serialize() error");
         }
@@ -260,20 +260,20 @@ public class BroadcasterImpl implements Broadcaster {
 
     @Override
     public BroadcastResult broadcastToPeer(byte[] data, String peerId) {
-        NulsMessage message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, data);
+        NulsMessage message = new NulsMessage(network.packetMagic(), data);
         return broadcastToPeer(message, peerId);
     }
 
     @Override
-    public BroadcastResult broadcastToGroup(BaseNulsEvent event, String groupName) {
+    public BroadcastResult broadcastToGroup(BaseNetworkEvent event, String groupName) {
         return broadcastToGroup(event, groupName, null);
     }
 
     @Override
-    public BroadcastResult broadcastToGroup(BaseNulsEvent event, String groupName, String excludePeerId) {
+    public BroadcastResult broadcastToGroup(BaseNetworkEvent event, String groupName, String excludePeerId) {
         NulsMessage message = null;
         try {
-            message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, event.serialize());
+            message = new NulsMessage(network.packetMagic(), event.serialize());
         } catch (IOException e) {
             return new BroadcastResult(false, "event.serialize() error");
         }
@@ -287,18 +287,18 @@ public class BroadcasterImpl implements Broadcaster {
 
     @Override
     public BroadcastResult broadcastToGroup(byte[] data, String groupName, String excludePeerId) {
-        NulsMessage message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, data);
+        NulsMessage message = new NulsMessage(network.packetMagic(), data);
         return broadcastToGroup(message, groupName, excludePeerId);
     }
 
-    public BroadcastResult broadcastToGroupSync(BaseNulsEvent event, String groupName) {
+    public BroadcastResult broadcastToGroupSync(BaseNetworkEvent event, String groupName) {
         return broadcastToGroupSync(event, groupName, null);
     }
 
-    public BroadcastResult broadcastToGroupSync(BaseNulsEvent event, String groupName, String excludePeerId) {
+    public BroadcastResult broadcastToGroupSync(BaseNetworkEvent event, String groupName, String excludePeerId) {
         NulsMessage message = null;
         try {
-            message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, event.serialize());
+            message = new NulsMessage(network.packetMagic(), event.serialize());
         } catch (IOException e) {
             return new BroadcastResult(false, "event.serialize() error");
         }
@@ -310,7 +310,7 @@ public class BroadcasterImpl implements Broadcaster {
     }
 
     public BroadcastResult broadcastToGroupSync(byte[] data, String groupName, String excludePeerId) {
-        NulsMessage message = new NulsMessage(network.packetMagic(), NulsMessageHeader.EVENT_MESSAGE, data);
+        NulsMessage message = new NulsMessage(network.packetMagic(), data);
         return broadcastToGroupSync(message, groupName, excludePeerId);
     }
 

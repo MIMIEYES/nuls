@@ -2,23 +2,27 @@ package io.nuls.ledger.module.impl;
 
 import io.nuls.account.entity.Account;
 import io.nuls.account.service.intf.AccountService;
+import io.nuls.core.chain.manager.TransactionValidatorManager;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.thread.manager.ThreadManager;
-import io.nuls.event.bus.processor.service.intf.NetworkProcessorService;
+import io.nuls.event.bus.processor.service.intf.NetworkEventProcessorService;
 import io.nuls.ledger.constant.LedgerConstant;
-import io.nuls.ledger.entity.validator.CommonTxValidatorManager;
-import io.nuls.ledger.event.AbstractCoinTransactionEvent;
-import io.nuls.ledger.event.UtxoDepositNulsEvent;
-import io.nuls.ledger.event.UtxoLockNulsEvent;
-import io.nuls.ledger.event.UtxoSmallChangeEvent;
-import io.nuls.ledger.handler.UtxoCoinTransactionHandler;
-import io.nuls.ledger.handler.UtxoLockHandler;
-import io.nuls.ledger.handler.UtxoSmallChangeHandler;
+import io.nuls.ledger.event.*;
+import io.nuls.ledger.handler.CoinTransactionEventHandler;
+import io.nuls.ledger.handler.SmallChangeEventHandler;
+import io.nuls.ledger.handler.UnlockCoinEventHandler;
+import io.nuls.ledger.handler.LockCoinEventHandler;
 import io.nuls.ledger.module.AbstractLedgerModule;
-import io.nuls.ledger.service.impl.LedgerCacheServiceImpl;
+import io.nuls.ledger.service.impl.LedgerCacheService;
+import io.nuls.ledger.service.impl.UtxoCoinDataProvider;
 import io.nuls.ledger.service.impl.UtxoLedgerServiceImpl;
+import io.nuls.ledger.service.intf.CoinDataProvider;
 import io.nuls.ledger.service.intf.LedgerService;
 import io.nuls.ledger.thread.SmallChangeThread;
+import io.nuls.ledger.validator.TxFieldValidator;
+import io.nuls.ledger.validator.TxMaxSizeValidator;
+import io.nuls.ledger.validator.TxRemarkValidator;
+import io.nuls.ledger.validator.TxSignValidator;
 
 import java.util.List;
 
@@ -28,33 +32,58 @@ import java.util.List;
  */
 public class UtxoLedgerModuleImpl extends AbstractLedgerModule {
 
-    private AccountService accountService = NulsContext.getInstance().getService(AccountService.class);
 
-    private LedgerCacheServiceImpl cacheService = LedgerCacheServiceImpl.getInstance();
+    private LedgerCacheService cacheService = LedgerCacheService.getInstance();
 
     private LedgerService ledgerService = UtxoLedgerServiceImpl.getInstance();
 
-    private NetworkProcessorService processorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
+    private NetworkEventProcessorService processorService = NulsContext.getInstance().getService(NetworkEventProcessorService.class);
+
+    @Override
+    public void init() {
+        addNormalTxValidator();
+        registerService();
+        pulishEvent();
+    }
+
+    /**
+     * there validators any kind of transaction will be used
+     */
+    private void addNormalTxValidator() {
+        TransactionValidatorManager.addTxDefValidator(TxMaxSizeValidator.getInstance());
+        TransactionValidatorManager.addTxDefValidator(TxRemarkValidator.getInstance());
+        TransactionValidatorManager.addTxDefValidator(TxFieldValidator.getInstance());
+        TransactionValidatorManager.addTxDefValidator(TxSignValidator.getInstance());
+    }
+
+    private void registerService() {
+        this.registerService(ledgerService);
+        this.registerService(CoinDataProvider.class, UtxoCoinDataProvider.getInstance());
+    }
+
+    private void pulishEvent() {
+        this.publish(LedgerConstant.EVENT_TYPE_TRANSFER, TransferCoinEvent.class);
+        this.publish(LedgerConstant.EVENT_TYPE_LOCK_NULS, LockCoinEvent.class);
+        this.publish(LedgerConstant.EVENT_TYPE_UNLOCK_NULS, UnlockCoinEvent.class);
+        this.publish(LedgerConstant.EVENT_TYPE_SMALL_CHANGE, SmallChangeEvent.class);
+
+        this.processorService.registerEventHandler(TransferCoinEvent.class, new CoinTransactionEventHandler());
+        this.processorService.registerEventHandler(LockCoinEvent.class, new LockCoinEventHandler());
+        this.processorService.registerEventHandler(UnlockCoinEvent.class, new UnlockCoinEventHandler());
+        this.processorService.registerEventHandler(SmallChangeEvent.class, new SmallChangeEventHandler());
+    }
 
     @Override
     public void start() {
-        CommonTxValidatorManager.initTxValidators();
-        cacheStandingBook();
-        this.registerService(ledgerService);
+        cacheAccountAndBalance();
+
         SmallChangeThread smallChangeThread = SmallChangeThread.getInstance();
         ThreadManager.createSingleThreadAndRun(this.getModuleId(), SmallChangeThread.class.getSimpleName(), smallChangeThread);
-        this.registerEvent((short) 4, UtxoLockNulsEvent.class);
-        this.registerEvent((short) 5, UtxoSmallChangeEvent.class);
-        this.registerEvent((short) 6, AbstractCoinTransactionEvent.class);
-        this.registerEvent((short) 7, UtxoDepositNulsEvent.class);
-        this.processorService.registerEventHandler(UtxoLockNulsEvent.class, new UtxoLockHandler());
-        this.processorService.registerEventHandler(UtxoSmallChangeEvent.class, new UtxoSmallChangeHandler());
-        this.processorService.registerEventHandler(AbstractCoinTransactionEvent.class, new UtxoCoinTransactionHandler());
     }
 
-    private void cacheStandingBook() {
+    private void cacheAccountAndBalance() {
         //load account
-        List<Account> accounts = this.accountService.getLocalAccountList();
+        List<Account> accounts = NulsContext.getInstance().getService(AccountService.class).getLocalAccountList();
         if (null == accounts) {
             return;
         }

@@ -2,6 +2,7 @@ package io.nuls.consensus.entity;
 
 import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.chain.intf.NulsCloneable;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
@@ -29,7 +30,7 @@ public class Consensus<T extends BaseNulsData> extends BaseNulsData implements N
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
         stream.writeString(address);
         if (null != extend) {
             stream.writeBytesWithLength(extend.serialize());
@@ -37,21 +38,9 @@ public class Consensus<T extends BaseNulsData> extends BaseNulsData implements N
     }
 
     @Override
-    public void parse(NulsByteBuffer byteBuffer) {
+    protected void parse(NulsByteBuffer byteBuffer) throws NulsException {
         this.address = byteBuffer.readString();
-        if (!byteBuffer.isFinished()) {
-            this.extend = this.parseExtend(byteBuffer);
-        }
-    }
 
-    /**
-     * Extended use method
-     *
-     * @param byteBuffer
-     * @return
-     */
-    protected T parseExtend(NulsByteBuffer byteBuffer) {
-        return null;
     }
 
     public String getAddress() {

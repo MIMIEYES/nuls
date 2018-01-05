@@ -4,9 +4,7 @@ import io.nuls.core.chain.intf.NulsCloneable;
 import io.nuls.core.chain.manager.BlockValidatorManager;
 import io.nuls.core.chain.manager.TransactionManager;
 import io.nuls.core.constant.ErrorCode;
-import io.nuls.core.crypto.Sha256Hash;
-import io.nuls.core.crypto.VarInt;
-import io.nuls.core.event.EventManager;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.io.NulsByteBuffer;
@@ -15,6 +13,7 @@ import io.nuls.core.utils.log.Log;
 import io.nuls.core.validate.NulsDataValidator;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -26,8 +25,6 @@ public class Block extends BaseNulsData implements NulsCloneable {
     private BlockHeader header;
 
     private List<Transaction> txs;
-
-    private byte[] extend;
 
     public Block() {
         initValidators();
@@ -43,7 +40,7 @@ public class Block extends BaseNulsData implements NulsCloneable {
     @Override
     public int size() {
         int size = header.size();
-        size += Utils.sizeOfSerialize(extend);
+
         for (Transaction tx : txs) {
             size += tx.size();
         }
@@ -51,19 +48,18 @@ public class Block extends BaseNulsData implements NulsCloneable {
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
         header.serializeToStream(stream);
-        stream.writeBytesWithLength(extend);
+
         for (Transaction tx : txs) {
             stream.write(tx.serialize());
         }
     }
 
     @Override
-    public void parse(NulsByteBuffer byteBuffer) {
+    protected void parse(NulsByteBuffer byteBuffer) throws NulsException {
         header = new BlockHeader();
         header.parse(byteBuffer);
-        extend = byteBuffer.readByLengthByte();
         try {
             txs = TransactionManager.getInstances(byteBuffer);
         } catch (Exception e) {
@@ -87,13 +83,6 @@ public class Block extends BaseNulsData implements NulsCloneable {
         this.header = header;
     }
 
-    public byte[] getExtend() {
-        return extend;
-    }
-
-    public void setExtend(byte[] extend) {
-        this.extend = extend;
-    }
 
     @Override
     public Object copy() {
@@ -104,5 +93,13 @@ public class Block extends BaseNulsData implements NulsCloneable {
             Log.error(e);
             return null;
         }
+    }
+
+    public List<NulsDigestData> getTxHashList() {
+        List<NulsDigestData> list = new ArrayList<>();
+        for (Transaction tx : txs) {
+            list.add(tx.getHash());
+        }
+        return list;
     }
 }

@@ -1,15 +1,15 @@
 package io.nuls.event.bus.processor.thread;
 
-import io.nuls.core.event.BaseNulsEvent;
+import io.nuls.core.event.BaseNetworkEvent;
 import io.nuls.core.utils.log.Log;
-import io.nuls.event.bus.event.handler.intf.NulsEventHandler;
+import io.nuls.event.bus.handler.intf.NulsEventHandler;
 import io.nuls.event.bus.processor.manager.ProcessData;
 
 /**
  * @author Niels
  * @date 2017/11/6
  */
-public class NulsEventCall<T extends BaseNulsEvent> implements Runnable {
+public class NulsEventCall<T extends BaseNetworkEvent> implements Runnable {
     private final ProcessData<T> data;
     private final NulsEventHandler<T> handler;
 
@@ -24,9 +24,9 @@ public class NulsEventCall<T extends BaseNulsEvent> implements Runnable {
             return;
         }
         try {
-            boolean ok = handler.getFilterChain().startDoFilter(data.getEvent());
+            boolean ok = handler.getFilterChain().startDoFilter(data.getData());
             if (ok) {
-                handler.onEvent(data.getEvent(), data.getPeerId());
+                handler.onEvent(data.getData(), data.getPeerId());
             }
         } catch (Exception e) {
             Log.error(e);

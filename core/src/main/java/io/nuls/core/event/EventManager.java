@@ -1,9 +1,11 @@
 package io.nuls.core.event;
 
 import io.nuls.core.constant.ErrorCode;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.module.BaseNulsModule;
 import io.nuls.core.utils.io.NulsByteBuffer;
+import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.param.AssertUtil;
 
 import java.util.*;
@@ -13,17 +15,17 @@ import java.util.*;
  * @date 2017/11/7
  */
 public class EventManager {
-    private static final Map<String, Class<? extends BaseNulsEvent>> EVENT_MAP = new HashMap<>();
-    private static final Set<Class<? extends BaseNulsEvent>> EVENT_CLASSES = new HashSet<>();
+    private static final Map<String, Class<? extends BaseEvent>> EVENT_MAP = new HashMap<>();
+    private static final Set<Class<? extends BaseEvent>> EVENT_CLASSES = new HashSet<>();
 
-    public static void isLegal(Class<? extends BaseNulsEvent> eventClass) {
-        boolean b = EVENT_CLASSES.contains(eventClass);
+    public static void isLegal(Class<? extends BaseEvent> busDataClass) {
+        boolean b = EVENT_CLASSES.contains(busDataClass);
         if (!b) {
-            throw new NulsRuntimeException(ErrorCode.FAILED, "EventClass is not legal:" + eventClass.getName());
+            throw new NulsRuntimeException(ErrorCode.FAILED, "EventClass is not legal:" + busDataClass.getName());
         }
     }
 
-    public static void putEvent(short moduleId, short type, Class<? extends BaseNulsEvent> clazz) {
+    public static void putBusData(short moduleId, short type, Class<? extends BaseEvent> clazz) {
         if (type == 0) {
             throw new NulsRuntimeException(ErrorCode.FAILED, "the event type cannot be 0!,module:" + moduleId + ",eventType:" + type);
         }
@@ -31,44 +33,58 @@ public class EventManager {
             throw new NulsRuntimeException(ErrorCode.FAILED, "the event type is repeated,module:" + moduleId + ",eventType:" + type);
         }
         EVENT_MAP.put(moduleId + "_" + type, clazz);
-        cacheEventClass(clazz);
+        cacheDataClass(clazz);
     }
 
-    private static void cacheEventClass(Class<? extends BaseNulsEvent> clazz) {
+    private static void cacheDataClass(Class<? extends BaseEvent> clazz) {
         EVENT_CLASSES.add(clazz);
-        if (!clazz.getSuperclass().equals(BaseNulsEvent.class)) {
-            cacheEventClass((Class<? extends BaseNulsEvent>) clazz.getSuperclass());
+        if (!clazz.getSuperclass().equals(BaseEvent.class)) {
+            cacheDataClass((Class<? extends BaseEvent>) clazz.getSuperclass());
         }
     }
 
-    public static void putEvent(BaseNulsModule module, short type, Class<? extends BaseNulsEvent> clazz) {
+    public static void putBusData(BaseNulsModule module, short type, Class<? extends BaseEvent> clazz) {
         AssertUtil.canNotEmpty(clazz, "event class is null!");
         AssertUtil.canNotEmpty(module, "module is null,message" + clazz.getName());
         if (type == 0) {
             throw new NulsRuntimeException(ErrorCode.FAILED, "the event type cannot be 0!,module:" + module.getModuleId() + ",eventType:" + type);
         }
-        putEvent(module.getModuleId(), type, clazz);
+        putBusData(module.getModuleId(), type, clazz);
     }
 
-    public static BaseNulsEvent getInstance(byte[] bytes) throws IllegalAccessException, InstantiationException {
-        NulsEventHeader header = new NulsEventHeader();
+    public static BaseNetworkEvent getNetworkEventInstance(byte[] bytes) throws IllegalAccessException, InstantiationException, NulsException {
+        return (BaseNetworkEvent) getInstance(bytes);
+    }
+
+    public static BaseLocalEvent getLocalEventInstance(byte[] bytes) throws IllegalAccessException, InstantiationException, NulsException {
+        return (BaseLocalEvent) getInstance(bytes);
+    }
+
+    public static BaseEvent getInstance(byte[] bytes) throws NulsException {
+        EventHeader header = new EventHeader();
         header.parse(new NulsByteBuffer(bytes));
-        Class<? extends BaseNulsEvent> clazz = EVENT_MAP.get(header.getModuleId() + "_" + header.getEventType());
-        BaseNulsEvent event = clazz.newInstance();
+        Class<? extends BaseEvent> clazz = EVENT_MAP.get(header.getModuleId() + "_" + header.getEventType());
+        BaseEvent event = null;
+        try {
+            event = clazz.newInstance();
+        } catch (Exception e) {
+            Log.error(e);
+            throw  new NulsException(ErrorCode.DATA_PARSE_ERROR);
+        }
         event.parse(new NulsByteBuffer(bytes));
         return event;
     }
 
-    public static List<BaseNulsEvent> getInstances(NulsByteBuffer buffer) throws IllegalAccessException, InstantiationException {
-        List<BaseNulsEvent> list = new ArrayList<>();
-        while (!buffer.isFinished()) {
-            NulsEventHeader header = new NulsEventHeader();
-            header.parse(new NulsByteBuffer(buffer.getPayloadByCursor()));
-            Class<? extends BaseNulsEvent> clazz = EVENT_MAP.get(header.getModuleId() + "_" + header.getEventType());
-            BaseNulsEvent event = clazz.newInstance();
-            event.parse(buffer);
-            list.add(event);
-        }
-        return list;
-    }
+//    public static List<BaseBusData> getInstances(NulsByteBuffer buffer) throws IllegalAccessException, InstantiationException {
+//        List<BaseBusData> list = new ArrayList<>();
+//        while (!buffer.isFinished()) {
+//            BusDataHeader header = new BusDataHeader();
+//            header.parse(new NulsByteBuffer(buffer.getPayloadByCursor()));
+//            Class<? extends BaseBusData> clazz = EVENT_MAP.get(header.getModuleId() + "_" + header.getEventType());
+//            BaseBusData event = clazz.newInstance();
+//            event.parse(buffer);
+//            list.add(event);
+//        }
+//        return list;
+//    }
 }

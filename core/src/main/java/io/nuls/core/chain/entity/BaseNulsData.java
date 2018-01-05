@@ -1,5 +1,6 @@
 package io.nuls.core.chain.entity;
 
+import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.crypto.UnsafeByteArrayOutputStream;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.io.NulsByteBuffer;
@@ -16,7 +17,7 @@ import java.io.Serializable;
  * @author Niels
  * @date 2017/10/30
  */
-public abstract class BaseNulsData  implements Serializable {
+public abstract class BaseNulsData implements Serializable {
 
     protected NulsDataType dataType;
 
@@ -48,12 +49,15 @@ public abstract class BaseNulsData  implements Serializable {
      * @return
      */
     public final byte[] serialize() throws IOException {
-        this.verify();
         ByteArrayOutputStream bos = null;
         try {
             bos = new UnsafeByteArrayOutputStream(size());
             NulsOutputStreamBuffer buffer = new NulsOutputStreamBuffer(bos);
-            serializeToStream(buffer);
+            if (size() == 0) {
+                bos.write(NulsConstant.PLACE_HOLDER);
+            } else {
+                serializeToStream(buffer);
+            }
             return bos.toByteArray();
         } finally {
             if (bos != null) {
@@ -66,25 +70,28 @@ public abstract class BaseNulsData  implements Serializable {
         }
     }
 
+    public final void parse(byte[] bytes) throws NulsException {
+        if (bytes == null || bytes.length == 0 || NulsConstant.PLACE_HOLDER == bytes[0]) {
+            return;
+        }
+        this.parse(new NulsByteBuffer(bytes));
+    }
+
     /**
      * serialize important field
      *
      * @param stream
      * @throws IOException
      */
-    public abstract void serializeToStream(NulsOutputStreamBuffer stream) throws IOException;
+    protected abstract void serializeToStream(NulsOutputStreamBuffer stream) throws IOException;
 
-    public abstract void parse(NulsByteBuffer byteBuffer) throws NulsException;
-
-    public final void parse(byte[] bytes) throws NulsException {
-        this.parse(new NulsByteBuffer(bytes));
-    }
+    protected abstract void parse(NulsByteBuffer byteBuffer) throws NulsException;
 
     /**
      * @throws NulsException
      */
     public final ValidateResult verify() {
-       return this.validatorChain.startDoValidator(this);
+        return this.validatorChain.startDoValidator(this);
     }
 
     public NulsDataType getDataType() {
@@ -97,6 +104,9 @@ public abstract class BaseNulsData  implements Serializable {
 
 
     public NulsVersion getVersion() {
+        if (null == version) {
+            version = new NulsVersion((short) 1, (short) 1);
+        }
         return version;
     }
 

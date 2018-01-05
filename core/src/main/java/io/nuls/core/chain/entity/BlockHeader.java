@@ -2,9 +2,11 @@ package io.nuls.core.chain.entity;
 
 import io.nuls.core.chain.manager.BlockHeaderValidatorManager;
 import io.nuls.core.crypto.VarInt;
+import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
+import io.nuls.core.utils.log.Log;
 import io.nuls.core.validate.NulsDataValidator;
 
 import java.io.IOException;
@@ -29,9 +31,9 @@ public class BlockHeader extends BaseNulsData {
 
     private String packingAddress;
 
-    private List<NulsDigestData> txHashList;
-
     private NulsSignData sign;
+
+    private byte[] extend;
 
     public BlockHeader() {
         initValidators();
@@ -48,40 +50,33 @@ public class BlockHeader extends BaseNulsData {
     public int size() {
         int size = 0;
         size += this.getVersion().size();
-        size += hash.size();
-        size += preHash.size();
-        size += merkleHash.size();
+        size += Utils.sizeOfSerialize(preHash);
+        size += Utils.sizeOfSerialize(merkleHash);
         size += Utils.sizeOfSerialize(time);
         size += Utils.sizeOfSerialize(height);
         size += Utils.sizeOfSerialize(txCount);
         size += Utils.sizeOfSerialize(packingAddress);
-        size += sign.size();
-        for (NulsDigestData txHash : txHashList) {
-            size += txHash.size();
-        }
+        size += Utils.sizeOfSerialize(extend);
+        size += Utils.sizeOfSerialize(sign);
         return size;
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
         stream.writeShort(this.getVersion().getVersion());
-        this.hash.serializeToStream(stream);
-        this.preHash.serializeToStream(stream);
-        this.merkleHash.serializeToStream(stream);
+        stream.writeNulsData(preHash);
+        stream.writeNulsData(merkleHash);
         stream.writeVarInt(time);
         stream.writeVarInt(height);
         stream.writeVarInt(txCount);
         stream.writeString(packingAddress);
-        this.sign.serializeToStream(stream);
-        for (int i = 0; i < txHashList.size(); i++) {
-            txHashList.get(i).serializeToStream(stream);
-        }
+        stream.writeBytesWithLength(extend);
+        stream.writeNulsData(this.sign);
     }
 
     @Override
-    public void parse(NulsByteBuffer byteBuffer) {
+    protected void parse(NulsByteBuffer byteBuffer) throws NulsException {
         this.version = new NulsVersion(byteBuffer.readShort());
-        this.hash = new NulsDigestData();
         this.hash.parse(byteBuffer);
         this.preHash = new NulsDigestData();
         this.preHash.parse(byteBuffer);
@@ -91,14 +86,14 @@ public class BlockHeader extends BaseNulsData {
         this.height = byteBuffer.readVarInt();
         this.txCount = byteBuffer.readVarInt();
         this.packingAddress = byteBuffer.readString();
-        this.sign = new NulsSignData();
-        this.sign.parse(byteBuffer);
-        txHashList = new ArrayList<>();
-        for (int i = 0; i < txCount; i++) {
-            NulsDigestData hash = new NulsDigestData();
-            hash.parse(byteBuffer);
-            txHashList.add(hash);
+        this.extend = byteBuffer.readByLengthByte();
+        try {
+            this.hash = NulsDigestData.calcDigestData(this.serialize());
+        } catch (IOException e) {
+            Log.error(e);
         }
+        this.sign = byteBuffer.readSign();
+
     }
 
     public NulsDigestData getHash() {
@@ -157,20 +152,18 @@ public class BlockHeader extends BaseNulsData {
         this.sign = sign;
     }
 
-    public List<NulsDigestData> getTxHashList() {
-        return txHashList;
-    }
-
-    public void setTxHashList(List<NulsDigestData> txHashList) {
-        this.txHashList = txHashList;
-    }
-
     public void setPackingAddress(String packingAddress) {
         this.packingAddress = packingAddress;
     }
 
     public String getPackingAddress() {
-
         return packingAddress;
+    }
+    public byte[] getExtend() {
+        return extend;
+    }
+
+    public void setExtend(byte[] extend) {
+        this.extend = extend;
     }
 }

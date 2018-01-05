@@ -4,7 +4,6 @@ import io.nuls.core.chain.entity.Na;
 
 /**
  * @author Niels
- * @date 2017/11/8
  */
 public interface PocConsensusConstant {
     //version
@@ -15,21 +14,20 @@ public interface PocConsensusConstant {
     String CFG_CONSENSUS_SECTION = "Consensus";
     String PROPERTY_DELEGATE_PEER = "delegate-peer";
 
-    short EVENT_TYPE_REGISTER_AGENT = 8;
-    short EVENT_TYPE_ASK_BLOCK = 9;
+    String DEFAULT_CONSENSUS_LIST_FILE = "default-consensus-list.properties";
+    String GENESIS_BLOCK_FILE = "genesis-block.json";
+
+    short EVENT_TYPE_JOIN_CONSENSUS = 11;
+    short EVENT_TYPE_EXIT_CONSENSUS = 12;
+    short EVENT_TYPE_REGISTER_AGENT = 13;
     short EVENT_TYPE_RED_PUNISH = 10;
-
-
-    int TX_TYPE_REGISTER_AGENT = 10;
-    int TX_TYPE_RED_PUNISH = 11;
-    int TX_TYPE_YELLOW_PUNISH = 12;
     short EVENT_TYPE_YELLOW_PUNISH = 13;
 
     /**
      * TODO THE PARAMETERS OF CONSENSUS,bellow
      */
     int CONFIRM_BLOCK_COUNT = 6;
-
+    int MIN_CONSENSUS_AGENT_COUNT = 30;
     /**
      * Set temporarily as a fixed value,unit:nuls
      */
@@ -54,6 +52,10 @@ public interface PocConsensusConstant {
 
     Na SUM_OF_DEPOSIT_OF_AGENT_LOWER_LIMIT = Na.parseNuls(200000);
     Na SUM_OF_DEPOSIT_OF_AGENT_UPPER_LIMIT = Na.parseNuls(500000);
+    /**
+     * Annual inflation
+     */
+    Na ANNUAL_INFLATION = Na.parseNuls(5000000);
     /**
      * unit: %
      */

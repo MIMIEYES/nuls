@@ -15,13 +15,19 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by Niels on 2017/9/27.
  *
+ * @author Niels
+ * @date 2017/9/27
  */
 public class MQModuleImpl extends AbstractMQModule {
 
     public MQModuleImpl() {
         super();
+    }
+
+    @Override
+    public void init() {
+        // todo auto-generated method stub(niels)
     }
 
     @Override

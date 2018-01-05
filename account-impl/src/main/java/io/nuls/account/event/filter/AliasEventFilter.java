@@ -1,8 +1,8 @@
 package io.nuls.account.event.filter;
 
 import io.nuls.account.entity.event.AliasEvent;
-import io.nuls.event.bus.event.filter.NulsEventFilter;
-import io.nuls.event.bus.event.filter.NulsEventFilterChain;
+import io.nuls.event.bus.filter.NulsEventFilter;
+import io.nuls.event.bus.filter.NulsEventFilterChain;
 
 /**
  * @author vivi

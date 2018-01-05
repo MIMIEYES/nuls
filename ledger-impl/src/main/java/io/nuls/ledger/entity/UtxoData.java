@@ -1,19 +1,25 @@
 package io.nuls.ledger.entity;
 
-import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
+import io.nuls.ledger.validator.UtxoTxInputsValidator;
+import io.nuls.ledger.validator.UtxoTxOutputsValidator;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 
 /**
  * @author Niels
  * @date 2017/11/16
  */
-public class UtxoData extends BaseNulsData{
+public class UtxoData extends CoinData{
+    public UtxoData(){
+        this.registerValidator(UtxoTxInputsValidator.getInstance());
+        this.registerValidator(UtxoTxOutputsValidator.getInstance());
+    }
+
     private List<UtxoInput> inputs;
+
     private List<UtxoOutput> outputs;
 
     public List<UtxoInput> getInputs() {
@@ -39,13 +45,13 @@ public class UtxoData extends BaseNulsData{
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
         //todo
 
     }
 
     @Override
-    public void parse(NulsByteBuffer byteBuffer) {
+    protected void parse(NulsByteBuffer byteBuffer) {
         //todo
 
     }

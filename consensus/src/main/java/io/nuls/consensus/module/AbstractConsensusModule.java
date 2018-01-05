@@ -1,10 +1,8 @@
 package io.nuls.consensus.module;
 
-import io.nuls.consensus.constant.ConsensusConstant;
 import io.nuls.consensus.constant.ConsensusEventType;
+import io.nuls.consensus.entity.TxGroup;
 import io.nuls.consensus.event.*;
-import io.nuls.consensus.tx.ExitConsensusTransaction;
-import io.nuls.consensus.tx.JoinConsensusTransaction;
 import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.module.BaseNulsModule;
 
@@ -15,16 +13,15 @@ import io.nuls.core.module.BaseNulsModule;
 public abstract class AbstractConsensusModule extends BaseNulsModule {
     public AbstractConsensusModule() {
         super(NulsConstant.MODULE_ID_CONSENSUS);
-        this.registerEvent(ConsensusEventType.JOIN, JoinConsensusEvent.class);
-        this.registerEvent(ConsensusEventType.EXIT, ExitConsensusEvent.class);
-        this.registerEvent(ConsensusEventType.BLOCK, BlockEvent.class);
-        this.registerEvent(ConsensusEventType.BLOCK_HEADER, BlockHeaderEvent.class);
-        this.registerEvent(ConsensusEventType.SMALL_BLOCK, SmallBlockEvent.class);
-        this.registerEvent(ConsensusEventType.GET_SMALL_BLOCK, GetSmallBlockEvent.class);
-        this.registerEvent(ConsensusEventType.GET_BLOCK, GetBlockEvent.class);
-        
-        this.registerTransaction(ConsensusConstant.TX_TYPE_JOIN_CONSENSUS, JoinConsensusTransaction.class);
-        this.registerTransaction(ConsensusConstant.TX_TYPE_EXIT_CONSENSUS, ExitConsensusTransaction.class);
+        this.publish(ConsensusEventType.BLOCK, BlockEvent.class);
+        this.publish(ConsensusEventType.BLOCK_HEADER, BlockHeaderEvent.class);
+        this.publish(ConsensusEventType.SMALL_BLOCK, SmallBlockEvent.class);
+        this.publish(ConsensusEventType.TX_GROUP, TxGroupEvent.class);
+        this.publish(ConsensusEventType.GET_SMALL_BLOCK, GetSmallBlockEvent.class);
+        this.publish(ConsensusEventType.GET_BLOCK, GetBlockEvent.class);
+        this.publish(ConsensusEventType.GET_TX_GROUP, GetTxGroupEvent.class);
+        this.publish(ConsensusEventType.GET_BLOCK_HEADER, GetBlockHeaderEvent.class);
+
     }
 
 }

@@ -4,9 +4,13 @@ import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.chain.entity.BasicTypeData;
 import io.nuls.core.chain.entity.NulsVersion;
 import io.nuls.core.constant.ErrorCode;
+import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.crypto.Sha256Hash;
 import io.nuls.core.crypto.VarInt;
+import io.nuls.core.event.BaseEvent;
+import io.nuls.core.event.BaseNetworkEvent;
+import io.nuls.core.event.EventManager;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsVerificationException;
 import io.nuls.core.mesasge.NulsMessage;
@@ -18,15 +22,16 @@ import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
 import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.str.StringUtils;
-import io.nuls.db.dao.PeerDao;
-import io.nuls.event.bus.processor.service.intf.LocalProcessorService;
-import io.nuls.event.bus.processor.service.intf.NetworkProcessorService;
+import io.nuls.event.bus.processor.service.intf.LocalEventProcessorService;
+import io.nuls.event.bus.processor.service.intf.NetworkEventProcessorService;
+import io.nuls.event.bus.service.intf.EventProducer;
 import io.nuls.network.constant.NetworkConstant;
 import io.nuls.network.entity.param.AbstractNetworkParam;
 import io.nuls.network.message.*;
-import io.nuls.network.message.entity.GetVersionData;
+import io.nuls.network.message.entity.GetVersionEvent;
 import io.nuls.network.message.entity.VersionData;
-import io.nuls.network.message.messageHandler.NetWorkDataHandler;
+import io.nuls.network.message.filter.MessageFilterChain;
+import io.nuls.network.message.handler.NetWorkEventHandler;
 import io.nuls.network.module.AbstractNetworkModule;
 import io.nuls.network.service.MessageWriter;
 
@@ -83,26 +88,22 @@ public class Peer extends BaseNulsData {
 
     private Lock lock = new ReentrantLock();
 
-    private NetworkProcessorService networkProcessorService;
+    private EventProducer producer;
 
-    private LocalProcessorService localProcessorService;
+    private LocalEventProcessorService localEventProcessorService;
 
-    private AbstractNetWorkDataHandlerFactory messageHandlerFactory;
+    private NetworkEventHandlerFactory messageHandlerFactory;
 
     public Peer() {
         super(OWN_MAIN_VERSION, OWN_SUB_VERSION);
-    }
-
-    public Peer(NulsByteBuffer buffer) {
-        parse(buffer);
     }
 
     public Peer(AbstractNetworkParam network) {
         super(OWN_MAIN_VERSION, OWN_SUB_VERSION);
         this.magicNumber = network.packetMagic();
         this.messageHandlerFactory = network.getMessageHandlerFactory();
-        networkProcessorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
-        localProcessorService = NulsContext.getInstance().getService(LocalProcessorService.class);
+        producer = NulsContext.getInstance().getService(EventProducer.class);
+        localEventProcessorService = NulsContext.getInstance().getService(LocalEventProcessorService.class);
     }
 
     public Peer(AbstractNetworkParam network, int type) {
@@ -110,8 +111,8 @@ public class Peer extends BaseNulsData {
         this.magicNumber = network.packetMagic();
         this.type = type;
         this.messageHandlerFactory = network.getMessageHandlerFactory();
-        networkProcessorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
-        localProcessorService = NulsContext.getInstance().getService(LocalProcessorService.class);
+        producer = NulsContext.getInstance().getService(EventProducer.class);
+        localEventProcessorService = NulsContext.getInstance().getService(LocalEventProcessorService.class);
     }
 
 
@@ -122,14 +123,14 @@ public class Peer extends BaseNulsData {
         this.port = socketAddress.getPort();
         this.ip = socketAddress.getAddress().getHostAddress();
         this.messageHandlerFactory = network.getMessageHandlerFactory();
-        networkProcessorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
-        localProcessorService = NulsContext.getInstance().getService(LocalProcessorService.class);
+        producer = NulsContext.getInstance().getService(EventProducer.class);
+        localEventProcessorService = NulsContext.getInstance().getService(LocalEventProcessorService.class);
         this.hash = this.ip + this.port;
     }
 
     public void connectionOpened() throws IOException {
-        GetVersionData data = new GetVersionData(AbstractNetworkModule.ExternalPort);
-        sendNetworkData(data);
+        GetVersionEvent event = new GetVersionEvent(AbstractNetworkModule.ExternalPort);
+        sendNetworkEvent(event);
         this.status = Peer.CONNECTING;
     }
 
@@ -140,10 +141,8 @@ public class Peer extends BaseNulsData {
         if (writeTarget == null || this.status != Peer.HANDSHAKE) {
             throw new NotYetConnectedException();
         }
-
         lock.lock();
         try {
-
             System.out.println("---send message:" + Hex.encode(message.serialize()));
             this.writeTarget.write(message.serialize());
         } finally {
@@ -151,20 +150,20 @@ public class Peer extends BaseNulsData {
         }
     }
 
-    public void sendNetworkData(BaseNetworkData networkData) throws IOException {
+    public void sendNetworkEvent(BaseNetworkEvent event) throws IOException {
         if (this.getStatus() == Peer.CLOSE) {
             return;
         }
         if (writeTarget == null) {
             throw new NotYetConnectedException();
         }
-        if (this.status != Peer.HANDSHAKE && !isHandShakeMessage(networkData)) {
+        if (this.status != Peer.HANDSHAKE && !isHandShakeMessage(event)) {
             throw new NotYetConnectedException();
         }
         lock.lock();
         try {
-            byte[] data = networkData.serialize();
-            NulsMessage message = new NulsMessage(magicNumber, NulsMessageHeader.NETWORK_MESSAGE, data);
+            byte[] data = event.serialize();
+            NulsMessage message = new NulsMessage(magicNumber, data);
             this.writeTarget.write(message.serialize());
         } finally {
             lock.unlock();
@@ -176,7 +175,7 @@ public class Peer extends BaseNulsData {
      *
      * @throws IOException
      */
-    public void receiveMessage(ByteBuffer buffer) throws IOException {
+    public void receiveMessage(ByteBuffer buffer) throws IOException, NulsException {
         buffer.flip();
         if (this.getStatus() == Peer.CLOSE) {
             return;
@@ -190,17 +189,28 @@ public class Peer extends BaseNulsData {
 
 //        buffer.compact();
         buffer.clear();
-        processMessage(message);
-
+        if (MessageFilterChain.getInstance().doFilter(message)) {
+            processMessage(message);
+        }
     }
 
     /**
-     * if message is a eventMessage , put it in processorService ,other module will process it
+     * if message is not a networkEvent, put it in eventProducer ,other module will consume it
      *
      * @param message
      */
-    public void processMessage(NulsMessage message) throws IOException {
-        if (message.getHeader().getHeadType() == NulsMessageHeader.EVENT_MESSAGE) {
+    public void processMessage(NulsMessage message) throws IOException, NulsException {
+        BaseEvent event = EventManager.getInstance(message.getData());
+
+        if (isNetworkEvent(event)) {
+            if (this.status != Peer.HANDSHAKE && !isHandShakeMessage(event)) {
+                return;
+            }
+
+            BaseNetworkEvent networkEvent = (BaseNetworkEvent) event;
+            asynExecute(networkEvent);
+        } else {
+
             try {
                 System.out.println("------receive message:" + Hex.encode(message.serialize()));
             } catch (IOException e) {
@@ -213,34 +223,17 @@ public class Peer extends BaseNulsData {
             if (checkBroadcastExist(message.getData())) {
                 return;
             }
-            networkProcessorService.send(message.getData(), this.getHash());
-        } else {
-
-            byte[] networkHeader = new byte[NetworkDataHeader.NETWORK_HEADER_SIZE];
-            System.arraycopy(message.getData(), 0, networkHeader, 0, NetworkDataHeader.NETWORK_HEADER_SIZE);
-            NetworkDataHeader header = new NetworkDataHeader(new NulsByteBuffer(networkHeader));
-
-            BaseNetworkData networkMessage = null;
-            try {
-                networkMessage = BaseNetworkData.transfer(header.getType(), message.getData());
-            } catch (NulsException e) {
-                Log.error("networkMessage transfer error:", e);
-                this.destroy();
-            }
-            if (this.status != Peer.HANDSHAKE && !isHandShakeMessage(networkMessage)) {
-                return;
-            }
-            asynExecute(networkMessage);
+            producer.sendNetworkEvent(message.getData(), this.getHash());
         }
     }
 
-    private void asynExecute(BaseNetworkData networkMessage) {
-        NetWorkDataHandler handler = messageHandlerFactory.getHandler(networkMessage);
+    private void asynExecute(BaseNetworkEvent networkMessage) {
+        NetWorkEventHandler handler = messageHandlerFactory.getHandler(networkMessage);
         ThreadManager.asynExecuteRunnable(new Runnable() {
             @Override
             public void run() {
                 try {
-                    NetworkDataResult messageResult = handler.process(networkMessage, Peer.this);
+                    NetworkEventResult messageResult = handler.process(networkMessage, Peer.this);
                     processMessageResult(messageResult);
                 } catch (Exception e) {
                     Log.error("process message error", e);
@@ -262,15 +255,15 @@ public class Peer extends BaseNulsData {
         if (result.getRepliedCount() < result.getWaitReplyCount()) {
             NetworkCacheService.getInstance().addBroadCastResult(result);
         } else {
-            ReplyEvent event = new ReplyEvent();
+            ReplyNotice event = new ReplyNotice();
             event.setEventBody(new BasicTypeData<>(data));
-            localProcessorService.send(event);
+            localEventProcessorService.dispatch(event);
         }
         return true;
     }
 
 
-    public void processMessageResult(NetworkDataResult dataResult) throws IOException {
+    public void processMessageResult(NetworkEventResult dataResult) throws IOException {
         if (this.getStatus() == Peer.CLOSE) {
             return;
         }
@@ -278,7 +271,7 @@ public class Peer extends BaseNulsData {
             return;
         }
         if (dataResult.getReplyMessage() != null) {
-            sendNetworkData(dataResult.getReplyMessage());
+            sendNetworkEvent(dataResult.getReplyMessage());
         }
     }
 
@@ -311,7 +304,7 @@ public class Peer extends BaseNulsData {
     }
 
     @Override
-    public void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+    protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
         stream.writeShort(version.getVersion());
         stream.write(new VarInt(magicNumber).encode());
         stream.write(new VarInt(port).encode());
@@ -319,23 +312,32 @@ public class Peer extends BaseNulsData {
     }
 
     @Override
-    public void parse(NulsByteBuffer buffer) {
+    public void parse(NulsByteBuffer buffer) throws NulsException {
         version = new NulsVersion(buffer.readShort());
         magicNumber = (int) buffer.readVarInt();
         port = (int) buffer.readVarInt();
         ip = new String(buffer.readByLengthByte());
-        networkProcessorService = NulsContext.getInstance().getService(NetworkProcessorService.class);
-        localProcessorService = NulsContext.getInstance().getService(LocalProcessorService.class);
+        producer = NulsContext.getInstance().getService(EventProducer.class);
+        localEventProcessorService = NulsContext.getInstance().getService(LocalEventProcessorService.class);
     }
 
 
-    public boolean isHandShakeMessage(BaseNetworkData networkMessage) {
-        return (networkMessage.getNetworkHeader().getType() == NetworkConstant.NETWORK_GET_VERSION_MESSAGE
-                || networkMessage.getNetworkHeader().getType() == NetworkConstant.NETWORK_VERSION_MESSAGE);
+    public boolean isHandShakeMessage(BaseEvent event) {
+        if (isNetworkEvent(event)) {
+            if (event.getHeader().getEventType() == NetworkConstant.NETWORK_GET_VERSION_MESSAGE
+                    || event.getHeader().getEventType() == NetworkConstant.NETWORK_VERSION_MESSAGE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isHandShake() {
         return this.status == Peer.HANDSHAKE;
+    }
+
+    private boolean isNetworkEvent(BaseEvent event) {
+        return event.getHeader().getModuleId() == NulsConstant.MODULE_ID_NETWORK;
     }
 
     @Override
@@ -437,11 +439,11 @@ public class Peer extends BaseNulsData {
         this.magicNumber = magicNumber;
     }
 
-    public void setMessageHandlerFactory(AbstractNetWorkDataHandlerFactory factory) {
+    public void setMessageHandlerFactory(NetworkEventHandlerFactory factory) {
         this.messageHandlerFactory = factory;
     }
 
-    public AbstractNetWorkDataHandlerFactory getMessageHandlerFactory() {
+    public NetworkEventHandlerFactory getMessageHandlerFactory() {
         return this.messageHandlerFactory;
     }
 
