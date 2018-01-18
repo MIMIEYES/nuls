@@ -1,12 +1,16 @@
 package io.nuls.ledger.service.impl;
 
+import io.nuls.account.entity.Address;
 import io.nuls.core.chain.entity.Na;
+import io.nuls.core.chain.entity.Transaction;
+import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.ledger.entity.CoinData;
 import io.nuls.ledger.entity.UtxoData;
 import io.nuls.ledger.entity.UtxoInput;
 import io.nuls.ledger.entity.UtxoOutput;
+import io.nuls.ledger.entity.params.Coin;
 import io.nuls.ledger.entity.params.CoinTransferData;
 import io.nuls.ledger.service.intf.CoinDataProvider;
 
@@ -19,11 +23,15 @@ import java.util.Map;
  * @date 2017/12/21
  */
 public class UtxoCoinDataProvider implements CoinDataProvider {
+
     private static final UtxoCoinDataProvider INSTANCE = new UtxoCoinDataProvider();
 
     private UtxoCoinDataProvider() {
 
     }
+
+
+    private UtxoCoinManager coinManager = UtxoCoinManager.getInstance();
 
     public static UtxoCoinDataProvider getInstance() {
         return INSTANCE;
@@ -38,7 +46,6 @@ public class UtxoCoinDataProvider implements CoinDataProvider {
 
     @Override
     public CoinTransferData getTransferData(CoinData coinData) {
-        // todo auto-generated method stub(niels)
         return null;
     }
 
@@ -61,15 +68,57 @@ public class UtxoCoinDataProvider implements CoinDataProvider {
     }
 
     @Override
-    public CoinData createTransferData(CoinTransferData coinParam, String password) {
+    public CoinData createTransferData(Transaction tx, CoinTransferData coinParam, String password) throws NulsException {
         UtxoData utxoData = new UtxoData();
         List<UtxoInput> inputs = new ArrayList<>();
         List<UtxoOutput> outputs = new ArrayList<>();
 
-        for (Map.Entry<String, Na> entry : coinParam.getFromMap().entrySet()) {
+        //find unSpends to create inputs for this tx
+        List<UtxoOutput> unSpends = coinManager.getAccountsUnSpend(coinParam.getFrom(), coinParam.getTotalNa().add(coinParam.getFee()));
 
+        long inputValue = 0;
+        for (UtxoOutput output : unSpends) {
+            UtxoInput input = new UtxoInput();
+            input.setFrom(output);
+            inputs.add(input);
+            input.setParent(tx);
+            inputValue += output.getValue();
         }
-            return null;
+
+        int i = 0;
+        long outputValue = 0;
+        for (Map.Entry<String, Coin> entry : coinParam.getToMap().entrySet()) {
+            UtxoOutput output = new UtxoOutput();
+            String address = entry.getKey();
+            Coin coin = entry.getValue();
+            output.setAddress(new Address(address).getHash160());
+            output.setValue(coin.getNa().getValue());
+            output.setIndex(i);
+            if (coin.getUnlockHeight() > 0) {
+                output.setLockTime(coin.getUnlockHeight());
+            } else {
+                output.setLockTime(coin.getUnlockTime());
+            }
+            output.setParent(tx);
+            outputValue += output.getValue();
+            outputs.add(output);
+            i++;
+        }
+
+        //the balance leave to myself
+        long balance = inputValue - outputValue - coinParam.getFee().getValue();
+        if (balance > 0) {
+            UtxoOutput output = new UtxoOutput();
+            output.setAddress(unSpends.get(0).getAddress());
+            output.setValue(balance);
+            output.setIndex(i);
+            outputs.add(output);
+        }
+
+        utxoData.setInputs(inputs);
+        utxoData.setOutputs(outputs);
+        return utxoData;
     }
+
 
 }

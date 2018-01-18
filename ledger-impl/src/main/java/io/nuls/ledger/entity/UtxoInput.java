@@ -4,15 +4,12 @@ import io.nuls.core.chain.entity.BaseNulsData;
 import io.nuls.core.chain.entity.NulsDigestData;
 import io.nuls.core.chain.entity.NulsSignData;
 import io.nuls.core.chain.entity.Transaction;
-import io.nuls.core.crypto.VarInt;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * @author win10
@@ -21,15 +18,14 @@ import java.util.List;
 public class UtxoInput extends BaseNulsData {
 
     private NulsDigestData txHash;
-    /**
-     * the output last time
-     */
 
-    private String fromId;
+    private int index;
 
-    private UtxoOutput from;
+    private int fromIndex;
 
     private NulsSignData sign;
+
+    private UtxoOutput from;
 
     private Transaction parent;
 
@@ -77,6 +73,11 @@ public class UtxoInput extends BaseNulsData {
     }
 
     public NulsDigestData getTxHash() {
+        if (txHash == null) {
+            if (parent != null) {
+                txHash = parent.getHash();
+            }
+        }
         return txHash;
     }
 
@@ -90,14 +91,6 @@ public class UtxoInput extends BaseNulsData {
 
     public void setSign(NulsSignData sign) {
         this.sign = sign;
-    }
-
-    public String getFromId() {
-        return fromId;
-    }
-
-    public void setFromId(String fromId) {
-        this.fromId = fromId;
     }
 
     public UtxoOutput getFrom() {
@@ -116,4 +109,19 @@ public class UtxoInput extends BaseNulsData {
         this.parent = parent;
     }
 
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
+    }
+
+    public int getFromIndex() {
+        return fromIndex;
+    }
+
+    public void setFromIndex(int fromIndex) {
+        this.fromIndex = fromIndex;
+    }
 }

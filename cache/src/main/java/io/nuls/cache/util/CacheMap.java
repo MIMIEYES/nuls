@@ -1,7 +1,6 @@
 package io.nuls.cache.util;
 
 import io.nuls.cache.service.intf.CacheService;
-import io.nuls.core.chain.intf.NulsCloneable;
 import io.nuls.core.context.NulsContext;
 
 import java.util.List;
@@ -14,15 +13,14 @@ import java.util.Set;
 public class CacheMap<K, V> {
 
     private final String cacheName;
+
     private CacheService cacheService = NulsContext.getInstance().getService(CacheService.class);
-
-    public CacheMap(String cacheName, int timeToLiveSeconds, int timeToIdleSeconds) {
-        this.cacheService.createCache(cacheName, timeToLiveSeconds, timeToIdleSeconds);
-        this.cacheName = cacheName;
+    public CacheMap(String cacheName, int heapMb ) {
+        this(cacheName,heapMb,0,0);
     }
-
-    public CacheMap(String cacheName) {
-        this(cacheName, 0, 0);
+    public CacheMap(String cacheName, int heapMb, int timeToLiveSeconds, int timeToIdleSeconds) {
+        this.cacheService.createCache(cacheName, heapMb, timeToLiveSeconds, timeToIdleSeconds);
+        this.cacheName = cacheName;
     }
 
     public int size() {
@@ -38,24 +36,19 @@ public class CacheMap<K, V> {
     }
 
     public boolean containsValue(V value) {
-        List<V> vlist = this.cacheService.getElementValueList(cacheName);
+        List<V> vlist = this.cacheService.getElementList(cacheName);
         return vlist.contains(value);
     }
 
 
     public V get(K key) {
-        return (V) this.cacheService.getElementValue(cacheName, key);
+        return (V) this.cacheService.getElement(cacheName, key);
     }
 
 
-    public <V extends NulsCloneable> void put(K key, V value) {
+    public void put(K key, V value) {
         this.cacheService.putElement(cacheName, key, value);
     }
-
-    public void putWithOutClone(K key, V value) {
-        this.cacheService.putElementWithoutClone(cacheName, key, value);
-    }
-
 
     public void remove(K key) {
         this.cacheService.removeElement(cacheName, key);
@@ -70,7 +63,7 @@ public class CacheMap<K, V> {
     }
 
     public List<V> values() {
-        return this.cacheService.getElementValueList(cacheName);
+        return this.cacheService.getElementList(cacheName);
     }
 
     public void destroy() {

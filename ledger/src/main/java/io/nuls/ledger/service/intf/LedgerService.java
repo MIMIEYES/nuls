@@ -1,52 +1,94 @@
 package io.nuls.ledger.service.intf;
 
-import io.nuls.account.entity.Account;
-import io.nuls.account.entity.Address;
 import io.nuls.core.chain.entity.Na;
 import io.nuls.core.chain.entity.NulsDigestData;
 import io.nuls.core.chain.entity.Result;
 import io.nuls.core.chain.entity.Transaction;
 import io.nuls.core.exception.NulsException;
-import io.nuls.core.validate.ValidateResult;
-import io.nuls.db.entity.TransactionPo;
 import io.nuls.ledger.entity.Balance;
-import io.nuls.ledger.entity.tx.TransferTransaction;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
- *
  * @author Niels
  * @date 2017/11/9
- *
  */
 public interface LedgerService {
 
-    ValidateResult verifyAndCacheTx(Transaction tx) throws NulsException;
+    void init();
 
-    Transaction getTxFromCache(String hash);
+    /**
+     * @param hash
+     * @return
+     */
+    Transaction getTx(NulsDigestData hash);
 
-    Transaction getTx(byte[] txid, boolean isMine);
+    /**
+     * @param hash
+     * @return
+     */
+    Transaction getLocalTx(NulsDigestData hash);
 
-    Transaction getTx(String hash, boolean isMine);
-
-    boolean txExist(String hash);
-
+    /**
+     * @param address
+     * @return
+     */
     Balance getBalance(String address);
 
-    Result transfer(TransferTransaction tx);
+    /**
+     * @param address
+     * @param password
+     * @param toAddress
+     * @param amount
+     * @param remark
+     * @return
+     */
+    Result transfer(String address, String password, String toAddress, Na amount, String remark);
 
-//    Result transfer(Account account, String password, Address toAddress, Na amount, String remark);
+    Result transfer(List<String> addressList, String password, String toAddress, Na amount, String remark);
 
-    boolean saveTransaction(Transaction tx);
+    /**
+     * unlockTime < 100,000,000,000  means the blockHeight
+     * unlockTime > 100,000,000,000  means the timestamp
+     *
+     * @param address
+     * @param password
+     * @param amount
+     * @param unlockTime
+     * @return
+     */
+    Result lock(String address, String password, Na amount, long unlockTime);
 
-    List<Transaction> queryListByAccount(String address, int txType, long beginTime);
+    /**
+     * @param txList
+     * @return
+     */
+    boolean saveTxList(List<Transaction> txList) throws IOException;
 
-    List<TransactionPo> queryPoListByAccount(String address, int txType, long beginTime);
+    /**
+     * @param address
+     * @param txType
+     * @param pageNumber
+     * @param pageSize
+     * @return
+     */
+    List<Transaction> getListByAddress(String address, int txType, int pageNumber, int pageSize) throws Exception;
 
-    Transaction getTransaction(NulsDigestData txHash);
 
-    void removeFromCache(List<NulsDigestData> txHashList);
+    /**
+     * @param blockHash
+     * @return
+     */
+    List<Transaction> getListByBlockHash(String blockHash) throws Exception;
 
-    List<Transaction> getTxListFromCache();
+    List<Transaction> getListByHeight(long startHeight, long endHeight) throws Exception;
+
+    List<Transaction> getListByHeight(long height) throws Exception;
+
+    void rollbackTx(Transaction tx) throws NulsException;
+
+    void commitTx(Transaction tx) throws NulsException;
+
+    void approvalTx(Transaction tx) throws NulsException;
 }

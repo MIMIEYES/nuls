@@ -2,7 +2,7 @@ package io.nuls.event.bus.service.impl;
 
 import io.nuls.cache.service.intf.CacheService;
 import io.nuls.core.context.NulsContext;
-import io.nuls.core.event.BaseNetworkEvent;
+import io.nuls.core.event.BaseEvent;
 
 /**
  * @author Niels
@@ -20,20 +20,20 @@ public class EventCacheService {
 
     public void init(){
         this.cacheService = NulsContext.getInstance().getService(CacheService.class);
-        this.cacheService.createCache(CACHE_OF_SENDED, 0, TIME_OF_IDLE_SECONDS);
-        this.cacheService.createCache(CACHE_OF_RECIEVED, 0, TIME_OF_IDLE_SECONDS);
+        this.cacheService.createCache(CACHE_OF_SENDED,100, 0, TIME_OF_IDLE_SECONDS);
+        this.cacheService.createCache(CACHE_OF_RECIEVED,100, 0, TIME_OF_IDLE_SECONDS);
     }
 
     public static EventCacheService getInstance() {
         return INSTANCE;
     }
 
-    public void cacheSendedEvent(BaseNetworkEvent event) {
+    public void cacheSendedEvent(BaseEvent event) {
         this.cacheService.putElement(CACHE_OF_SENDED, event.getHash().getDigestHex(), event);
     }
 
     public void cacheRecievedEventHash(String hashHex) {
-        this.cacheService.putElementWithoutClone(CACHE_OF_SENDED, hashHex, 1);
+        this.cacheService.putElement(CACHE_OF_SENDED, hashHex, 1);
     }
 
     public boolean isKnown(String hashHex) {
@@ -41,8 +41,8 @@ public class EventCacheService {
                 this.cacheService.containsKey(CACHE_OF_SENDED, hashHex);
     }
 
-    public BaseNetworkEvent getEvent(String hashHex) {
-        return (BaseNetworkEvent) this.cacheService.getElementValue(CACHE_OF_SENDED, hashHex);
+    public BaseEvent getEvent(String hashHex) {
+        return (BaseEvent) this.cacheService.getElement(CACHE_OF_SENDED, hashHex);
     }
 
     public void destroy() {

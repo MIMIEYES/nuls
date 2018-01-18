@@ -1,15 +1,15 @@
 package io.nuls.network.message;
 
-import io.nuls.core.event.BaseNetworkEvent;
-import io.nuls.network.message.entity.GetPeerEvent;
+import io.nuls.core.event.BaseEvent;
+import io.nuls.network.message.entity.GetNodeEvent;
 import io.nuls.network.message.entity.GetVersionEvent;
-import io.nuls.network.message.entity.PeerEvent;
-import io.nuls.network.message.entity.VersionData;
-import io.nuls.network.message.impl.GetPeerEventHandler;
-import io.nuls.network.message.impl.GetVersionDataHandler;
-import io.nuls.network.message.impl.PeerDataHandler;
-import io.nuls.network.message.impl.VersionDataHandler;
+import io.nuls.network.message.entity.NodeEvent;
+import io.nuls.network.message.entity.VersionEvent;
 import io.nuls.network.message.handler.NetWorkEventHandler;
+import io.nuls.network.message.impl.GetNodeEventHandler;
+import io.nuls.network.message.impl.GetVersionEventHandler;
+import io.nuls.network.message.impl.NodeEventHandler;
+import io.nuls.network.message.impl.VersionEventHandler;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,10 +25,10 @@ public class DefaultNetWorkEventHandlerFactory extends NetworkEventHandlerFactor
     private Map<String, NetWorkEventHandler> handlerMap = new HashMap<>();
 
     private DefaultNetWorkEventHandlerFactory() {
-//        handlerMap.put(VersionData.class.getName(), VersionDataHandler.getInstance());
-//        handlerMap.put(GetVersionEvent.class.getName(), GetVersionDataHandler.getInstance());
-//        handlerMap.put(GetPeerEvent.class.getName(), GetPeerEventHandler.getInstance());
-//        handlerMap.put(PeerEvent.class.getName(), PeerDataHandler.getInstance());
+        handlerMap.put(VersionEvent.class.getName(), VersionEventHandler.getInstance());
+        handlerMap.put(GetVersionEvent.class.getName(), GetVersionEventHandler.getInstance());
+        handlerMap.put(GetNodeEvent.class.getName(), GetNodeEventHandler.getInstance());
+        handlerMap.put(NodeEvent.class.getName(), NodeEventHandler.getInstance());
     }
 
     public static NetworkEventHandlerFactory getInstance() {
@@ -36,7 +36,7 @@ public class DefaultNetWorkEventHandlerFactory extends NetworkEventHandlerFactor
     }
 
     @Override
-    public NetWorkEventHandler getHandler(BaseNetworkEvent event) {
+    public NetWorkEventHandler getHandler(BaseEvent event) {
         return handlerMap.get(event.getClass().getName());
     }
 }

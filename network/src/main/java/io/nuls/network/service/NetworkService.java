@@ -1,9 +1,9 @@
 package io.nuls.network.service;
 
-import io.nuls.core.event.BaseNetworkEvent;
+import io.nuls.core.event.BaseEvent;
 import io.nuls.network.entity.BroadcastResult;
-import io.nuls.network.entity.Peer;
-import io.nuls.network.entity.PeerGroup;
+import io.nuls.network.entity.Node;
+import io.nuls.network.entity.NodeGroup;
 
 /**
  * @author vivi
@@ -11,56 +11,66 @@ import io.nuls.network.entity.PeerGroup;
  */
 public interface NetworkService {
 
+    void init();
+
     void start();
 
     void shutdown();
 
-    boolean isSeedPeer(String peerId);
+    void addNode(Node node);
 
-    boolean isSeedPeer();
+    void removeNode(String nodeId);
 
-    void addPeer(Peer peer);
+    void addNodeToGroup(String groupName, Node node);
 
-    void removePeer(String peerId);
+    void addNodeToGroup(String area,String groupName,Node node);
 
-    void addPeerToGroup(String groupName, Peer peer);
+    void removeNodeFromGroup(String groupName, String nodeId);
 
-    void addPeerGroup(PeerGroup peerGroup);
+    void removeNodeFromGroup(String area,String groupName,Node node);
 
-    BroadcastResult broadcast(BaseNetworkEvent event);
+    void addNodeGroup(NodeGroup nodeGroup);
 
-    BroadcastResult broadcast(BaseNetworkEvent event, String excludePeerId);
+    void addNodeGroup(String area,NodeGroup nodeGroup);
 
-    BroadcastResult broadcast(byte[] data);
+    BroadcastResult sendToAllNode(BaseEvent event);
 
-    BroadcastResult broadcast(byte[] data, String excludePeerId);
+    BroadcastResult sendToAllNode(String area, BaseEvent event);
 
-    BroadcastResult broadcastSync(BaseNetworkEvent event);
+    BroadcastResult sendToAllNode(BaseEvent event, String excludeNodeId);
 
-    BroadcastResult broadcastSync(BaseNetworkEvent event, String excludePeerId);
+    BroadcastResult sendToAllNode(String area, BaseEvent event, String excludeNodeId);
 
-    BroadcastResult broadcastSync(byte[] data);
+    BroadcastResult sendToAllNode(byte[] data);
 
-    BroadcastResult broadcastSync(byte[] data, String excludePeerId);
+    BroadcastResult sendToAllNode(String area, byte[] data);
 
-    BroadcastResult broadcastToPeer(BaseNetworkEvent event, String peerId);
+    BroadcastResult sendToAllNode(byte[] data, String excludeNodeId);
 
-    BroadcastResult broadcastToPeer(byte[] data, String peerId);
+    BroadcastResult sendToAllNode(String area, byte[] data, String excludeNodeId);
 
-    BroadcastResult broadcastToGroup(BaseNetworkEvent event, String groupName);
+    BroadcastResult sendToNode(BaseEvent event, String nodeId);
 
-    BroadcastResult broadcastToGroup(BaseNetworkEvent event, String groupName, String excludePeerId);
+    BroadcastResult sendToNode(String area, BaseEvent event, String nodeId);
 
-    BroadcastResult broadcastToGroup(byte[] data, String groupName);
+    BroadcastResult sendToNode(byte[] data, String nodeId);
 
-    BroadcastResult broadcastToGroup(byte[] data, String groupName, String excludePeerId);
+    BroadcastResult sendToNode(String area, byte[] data, String nodeId);
 
-    BroadcastResult broadcastToGroupSync(BaseNetworkEvent event, String groupName);
+    BroadcastResult sendToGroup(BaseEvent event, String groupName);
 
-    BroadcastResult broadcastToGroupSync(BaseNetworkEvent event, String groupName, String excludePeerId);
+    BroadcastResult sendToGroup(String area,BaseEvent event,String groupName);
 
-    BroadcastResult broadcastToGroupSync(byte[] data, String groupName);
+    BroadcastResult sendToGroup(BaseEvent event, String groupName, String excludeNodeId);
 
-    BroadcastResult broadcastToGroupSync(byte[] data, String groupName, String excludePeerId);
+    BroadcastResult sendToGroup(String area, BaseEvent event, String groupName, String excludeNodeId);
+
+    BroadcastResult sendToGroup(byte[] data, String groupName);
+
+    BroadcastResult sendToGroup(String area, byte[] data, String groupName);
+
+    BroadcastResult sendToGroup(byte[] data, String groupName, String excludeNodeId);
+
+    BroadcastResult sendToGroup(String area, byte[] data, String groupName, String excludeNodeId);
 
 }

@@ -12,7 +12,6 @@ import io.nuls.core.utils.log.Log;
 import io.nuls.core.validate.NulsDataValidator;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -21,43 +20,23 @@ import java.util.List;
  */
 public abstract class Transaction<T extends BaseNulsData> extends BaseNulsData implements NulsCloneable {
 
-    private List<TransactionListener> listenerList = new ArrayList<>();
-    /**
-     * tx type
-     */
-    private int type;
-    private NulsDigestData hash;
-    private NulsSignData sign;
-    private T txData;
-    private Na fee;
+    protected NulsDigestData hash;
 
-    private int blockHeight;
-    private NulsDigestData blockHash;
-    /**
-     * current time (ms)
-     *
-     * @return
-     */
+    protected int type;
+
     protected long time;
+
+    protected long blockHeight;
+
+    protected Na fee;
+
     protected byte[] remark;
 
-    public final void onRollback() throws NulsException {
-        for (TransactionListener listener : listenerList) {
-            listener.onRollback(this);
-        }
-    }
+    protected int index;
 
-    public final void onCommit() throws NulsException {
-        for (TransactionListener listener : listenerList) {
-            listener.onCommit(this);
-        }
-    }
+    protected NulsSignData sign;
 
-    public final void onApproval() throws NulsException {
-        for (TransactionListener listener : listenerList) {
-            listener.onApproval(this);
-        }
-    }
+    protected T txData;
 
     public Transaction(int type) {
         this.dataType = NulsDataType.TRANSACTION;
@@ -73,7 +52,7 @@ public abstract class Transaction<T extends BaseNulsData> extends BaseNulsData i
         }
     }
 
-    protected abstract T parseTxData(NulsByteBuffer byteBuffer) throws NulsException;
+    public abstract T parseTxData(NulsByteBuffer byteBuffer) throws NulsException;
 
     @Override
     public int size() {
@@ -118,10 +97,6 @@ public abstract class Transaction<T extends BaseNulsData> extends BaseNulsData i
             Log.error(e);
             return null;
         }
-    }
-
-    public void registerListener(TransactionListener listener) {
-        this.listenerList.add(listener);
     }
 
     public long getTime() {
@@ -180,19 +155,19 @@ public abstract class Transaction<T extends BaseNulsData> extends BaseNulsData i
         this.fee = fee;
     }
 
-    public int getBlockHeight() {
+    public long getBlockHeight() {
         return blockHeight;
     }
 
-    public void setBlockHeight(int blockHeight) {
+    public void setBlockHeight(long blockHeight) {
         this.blockHeight = blockHeight;
     }
 
-    public NulsDigestData getBlockHash() {
-        return blockHash;
+    public int getIndex() {
+        return index;
     }
 
-    public void setBlockHash(NulsDigestData blockHash) {
-        this.blockHash = blockHash;
+    public void setIndex(int index) {
+        this.index = index;
     }
 }

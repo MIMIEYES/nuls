@@ -4,11 +4,14 @@ import io.nuls.core.chain.entity.Result;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.exception.NulsRuntimeException;
-import io.nuls.db.dao.*;
-import io.nuls.db.dao.impl.mybatis.session.SessionAnnotation;
+import io.nuls.db.dao.AccountDataService;
+import io.nuls.db.dao.AccountAliasDataService;
+import io.nuls.db.dao.AliasDataService;
+import io.nuls.db.dao.TransactionLocalDataService;
 import io.nuls.db.entity.AccountPo;
 import io.nuls.db.entity.AliasPo;
 import io.nuls.db.entity.TransactionLocalPo;
+import io.nuls.db.transactional.annotation.TransactionalAnnotation;
 
 import java.util.List;
 
@@ -16,34 +19,34 @@ import java.util.List;
  * @author vivi
  * @date 2017/12/22.
  */
-public class AccountTxDaoImpl implements AccountTxDao {
+public class AccountTxDaoImpl implements AccountAliasDataService {
 
-    private AccountDao accountDao = NulsContext.getInstance().getService(AccountDao.class);
+    private AccountDataService accountDao = NulsContext.getInstance().getService(AccountDataService.class);
 
-    private AliasDao aliasDao = NulsContext.getInstance().getService(AliasDao.class);
+    private AliasDataService aliasDao = NulsContext.getInstance().getService(AliasDataService.class);
 
-    private TransactionLocalDao txDao = NulsContext.getInstance().getService(TransactionLocalDao.class);
+    private TransactionLocalDataService txDao = NulsContext.getInstance().getService(TransactionLocalDataService.class);
 
-    @SessionAnnotation
+    @TransactionalAnnotation
     @Override
-    public Result setAlias(String address, String alias) {
+    public Result saveAlias(AliasPo alias) {
         try {
-            AliasPo aliasPo = new AliasPo();
-            aliasPo.setAlias(alias);
-            aliasPo.setAddress(address);
-            aliasDao.save(aliasPo);
-
-            AccountPo po = new AccountPo();
-            po.setId(address);
-            po.setAlias(alias);
-            accountDao.updateSelective(po);
+            if (alias.getStatus() == 0) {
+                aliasDao.save(alias);
+            } else {
+                aliasDao.update(alias);
+                AccountPo po = new AccountPo();
+                po.setId(alias.getAddress());
+                po.setAlias(alias.getAlias());
+                accountDao.updateAlias(po);
+            }
         } catch (Exception e) {
             throw new NulsRuntimeException(ErrorCode.DB_SAVE_ERROR);
         }
         return new Result(true, "OK");
     }
 
-    @SessionAnnotation
+    @TransactionalAnnotation
     @Override
     public void importAccount(List<AccountPo> accountPoList) {
         for (AccountPo account : accountPoList) {
@@ -52,6 +55,20 @@ public class AccountTxDaoImpl implements AccountTxDao {
                 TransactionLocalPo tx = account.getMyTxs().get(i);
                 txDao.save(tx);
             }
+        }
+    }
+
+    @Override
+    public void rollbackAlias(AliasPo aliasPo) {
+        try {
+            aliasDao.delete(aliasPo.getAlias());
+
+            AccountPo po = new AccountPo();
+            po.setId(aliasPo.getAddress());
+            po.setAlias("");
+            accountDao.updateAlias(po);
+        } catch (Exception e) {
+            throw new NulsRuntimeException(ErrorCode.DB_ROLLBACK_ERROR);
         }
     }
 }

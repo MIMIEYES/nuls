@@ -18,20 +18,19 @@ public class AccountCacheService {
 
     private AccountCacheService() {
         this.cacheService = NulsContext.getInstance().getService(CacheService.class);
-        cacheService.createCache(AccountConstant.ACCOUNT_LIST_CACHE);
+        cacheService.createCache(AccountConstant.ACCOUNT_LIST_CACHE,32);
     }
 
     public static AccountCacheService getInstance() {
         return INSTANCE;
     }
 
-
     public void putAccount(Account account) {
         this.cacheService.putElement(AccountConstant.ACCOUNT_LIST_CACHE, account.getId(), account);
     }
 
     public Account getAccountById(String id) {
-        return this.cacheService.getElementValue(AccountConstant.ACCOUNT_LIST_CACHE, id);
+        return this.cacheService.getElement(AccountConstant.ACCOUNT_LIST_CACHE, id);
     }
 
     public Account getAccountByAddress(String address) {
@@ -44,8 +43,12 @@ public class AccountCacheService {
         return null;
     }
 
+    public boolean contains(String address) {
+        return this.cacheService.containsKey(AccountConstant.ACCOUNT_LIST_CACHE, address);
+    }
+
     public List<Account> getAccountList() {
-        return this.cacheService.getElementValueList(AccountConstant.ACCOUNT_LIST_CACHE);
+        return this.cacheService.getElementList(AccountConstant.ACCOUNT_LIST_CACHE);
     }
 
     public void removeAccount(Account account) {

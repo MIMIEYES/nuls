@@ -1,8 +1,6 @@
 package io.nuls.network.entity.param;
 
-import io.nuls.core.utils.cfg.ConfigLoader;
-import io.nuls.core.utils.network.IPUtil;
-import io.nuls.network.constant.NetworkConstant;
+import io.nuls.core.utils.network.IpUtil;
 import io.nuls.network.message.NetworkEventHandlerFactory;
 import io.nuls.network.message.filter.NulsMessageFilter;
 
@@ -17,11 +15,6 @@ import java.util.Set;
  */
 public abstract class AbstractNetworkParam {
 
-    public AbstractNetworkParam() {
-        this.maxInCount = ConfigLoader.getPropValue(NetworkConstant.NETWORK_PEER_MAX_IN, 50);
-        this.maxOutCount = ConfigLoader.getPropValue(NetworkConstant.NETWORK_PEER_MAX_OUT, 10);
-    }
-
     protected int port;
 
     protected int packetMagic;
@@ -34,12 +27,12 @@ public abstract class AbstractNetworkParam {
 
     protected NetworkEventHandlerFactory messageHandlerFactory;
 
-    protected List<InetSocketAddress> seedPeers = new ArrayList<>();
+    protected List<InetSocketAddress> seedNodes = new ArrayList<>();
 
-    protected Set<String> localIps = IPUtil.getIps();
+    protected Set<String> localIps = IpUtil.getIps();
 
-    public List<InetSocketAddress> getSeedPeers() {
-        return seedPeers;
+    public List<InetSocketAddress> getSeedNodes() {
+        return seedNodes;
     }
 
     public int port() {
@@ -81,4 +74,5 @@ public abstract class AbstractNetworkParam {
     public Set<String> getLocalIps() {
         return localIps;
     }
+
 }

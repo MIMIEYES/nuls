@@ -3,6 +3,7 @@ package io.nuls.core.chain.entity;
 import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.crypto.UnsafeByteArrayOutputStream;
 import io.nuls.core.exception.NulsException;
+import io.nuls.core.exception.NulsVerificationException;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
 import io.nuls.core.validate.DataValidatorChain;
@@ -26,7 +27,6 @@ public abstract class BaseNulsData implements Serializable {
     private DataValidatorChain validatorChain = new DataValidatorChain();
 
     public BaseNulsData() {
-
     }
 
     public BaseNulsData(NulsByteBuffer buffer) throws NulsException {
@@ -92,6 +92,13 @@ public abstract class BaseNulsData implements Serializable {
      */
     public final ValidateResult verify() {
         return this.validatorChain.startDoValidator(this);
+    }
+
+    public final void verifyWithException() throws NulsVerificationException {
+        ValidateResult result = this.verify();
+        if (result.isFailed()) {
+            throw new NulsVerificationException(result.getMessage());
+        }
     }
 
     public NulsDataType getDataType() {

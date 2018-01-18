@@ -3,7 +3,7 @@ package io.nuls.core.event;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
-import io.nuls.core.module.BaseNulsModule;
+import io.nuls.core.module.BaseModuleBootstrap;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.param.AssertUtil;
@@ -18,19 +18,33 @@ public class EventManager {
     private static final Map<String, Class<? extends BaseEvent>> EVENT_MAP = new HashMap<>();
     private static final Set<Class<? extends BaseEvent>> EVENT_CLASSES = new HashSet<>();
 
-    public static void isLegal(Class<? extends BaseEvent> busDataClass) {
+    public static void care(Class<? extends BaseEvent> busDataClass) {
         boolean b = EVENT_CLASSES.contains(busDataClass);
         if (!b) {
             throw new NulsRuntimeException(ErrorCode.FAILED, "EventClass is not legal:" + busDataClass.getName());
         }
     }
 
-    public static void putBusData(short moduleId, short type, Class<? extends BaseEvent> clazz) {
+    public static void putEvent(Class<? extends BaseEvent> clazz) {
+        try {
+            if (EVENT_MAP.values().contains(clazz)) {
+                return;
+            }
+            BaseEvent event = clazz.newInstance();
+            putEvent(event.getHeader().getModuleId(), event.getHeader().getEventType(), clazz);
+        } catch (InstantiationException e) {
+            Log.error(e);
+        } catch (IllegalAccessException e) {
+            Log.error(e);
+        }
+    }
+
+    private static void putEvent(short moduleId, short type, Class<? extends BaseEvent> clazz) {
         if (type == 0) {
             throw new NulsRuntimeException(ErrorCode.FAILED, "the event type cannot be 0!,module:" + moduleId + ",eventType:" + type);
         }
         if (EVENT_MAP.containsKey(moduleId + "_" + type)) {
-            throw new NulsRuntimeException(ErrorCode.FAILED, "the event type is repeated,module:" + moduleId + ",eventType:" + type);
+            return;
         }
         EVENT_MAP.put(moduleId + "_" + type, clazz);
         cacheDataClass(clazz);
@@ -43,23 +57,6 @@ public class EventManager {
         }
     }
 
-    public static void putBusData(BaseNulsModule module, short type, Class<? extends BaseEvent> clazz) {
-        AssertUtil.canNotEmpty(clazz, "event class is null!");
-        AssertUtil.canNotEmpty(module, "module is null,message" + clazz.getName());
-        if (type == 0) {
-            throw new NulsRuntimeException(ErrorCode.FAILED, "the event type cannot be 0!,module:" + module.getModuleId() + ",eventType:" + type);
-        }
-        putBusData(module.getModuleId(), type, clazz);
-    }
-
-    public static BaseNetworkEvent getNetworkEventInstance(byte[] bytes) throws IllegalAccessException, InstantiationException, NulsException {
-        return (BaseNetworkEvent) getInstance(bytes);
-    }
-
-    public static BaseLocalEvent getLocalEventInstance(byte[] bytes) throws IllegalAccessException, InstantiationException, NulsException {
-        return (BaseLocalEvent) getInstance(bytes);
-    }
-
     public static BaseEvent getInstance(byte[] bytes) throws NulsException {
         EventHeader header = new EventHeader();
         header.parse(new NulsByteBuffer(bytes));
@@ -69,22 +66,10 @@ public class EventManager {
             event = clazz.newInstance();
         } catch (Exception e) {
             Log.error(e);
-            throw  new NulsException(ErrorCode.DATA_PARSE_ERROR);
+            throw new NulsException(ErrorCode.DATA_PARSE_ERROR);
         }
         event.parse(new NulsByteBuffer(bytes));
         return event;
     }
 
-//    public static List<BaseBusData> getInstances(NulsByteBuffer buffer) throws IllegalAccessException, InstantiationException {
-//        List<BaseBusData> list = new ArrayList<>();
-//        while (!buffer.isFinished()) {
-//            BusDataHeader header = new BusDataHeader();
-//            header.parse(new NulsByteBuffer(buffer.getPayloadByCursor()));
-//            Class<? extends BaseBusData> clazz = EVENT_MAP.get(header.getModuleId() + "_" + header.getEventType());
-//            BaseBusData event = clazz.newInstance();
-//            event.parse(buffer);
-//            list.add(event);
-//        }
-//        return list;
-//    }
 }

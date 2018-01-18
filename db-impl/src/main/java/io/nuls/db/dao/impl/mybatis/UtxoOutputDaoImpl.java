@@ -1,13 +1,13 @@
 package io.nuls.db.dao.impl.mybatis;
 
 import com.github.pagehelper.PageHelper;
-import io.nuls.core.constant.TransactionConstant;
-import io.nuls.db.dao.UtxoOutputDao;
+import io.nuls.db.dao.UtxoOutputDataService;
 import io.nuls.db.dao.impl.mybatis.mapper.UtxoOutputMapper;
 import io.nuls.db.dao.impl.mybatis.util.SearchOperator;
 import io.nuls.db.dao.impl.mybatis.util.Searchable;
 import io.nuls.db.entity.UtxoOutputPo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +15,7 @@ import java.util.Map;
  * @author Niels
  * @date 2017/11/22
  */
-public class UtxoOutputDaoImpl extends BaseDaoImpl<UtxoOutputMapper, String, UtxoOutputPo> implements UtxoOutputDao {
+public class UtxoOutputDaoImpl extends BaseDaoImpl<UtxoOutputMapper, String, UtxoOutputPo> implements UtxoOutputDataService {
     public UtxoOutputDaoImpl() {
         super(UtxoOutputMapper.class);
     }
@@ -39,6 +39,23 @@ public class UtxoOutputDaoImpl extends BaseDaoImpl<UtxoOutputMapper, String, Utx
         searchable.addCondition("status", SearchOperator.eq, status);
         searchable.addCondition("address", SearchOperator.eq, address);
         PageHelper.orderBy("value asc");
+        return getMapper().selectList(searchable);
+    }
+
+    @Override
+    public List<UtxoOutputPo> getAllUnSpend() {
+        Searchable searchable = new Searchable();
+        searchable.addCondition("status", SearchOperator.ne, 2);
+        PageHelper.orderBy("address asc, status asc, value asc");
+        return getMapper().selectList(searchable);
+    }
+
+    @Override
+    public List<UtxoOutputPo> getAccountUnSpend(String address) {
+        Searchable searchable = new Searchable();
+        searchable.addCondition("status", SearchOperator.ne, 2);
+        searchable.addCondition("address", SearchOperator.eq, address);
+        PageHelper.orderBy("status asc, value asc");
         return getMapper().selectList(searchable);
     }
 }

@@ -6,7 +6,6 @@ import io.nuls.consensus.constant.ConsensusStatusEnum;
 import io.nuls.consensus.constant.PocConsensusConstant;
 import io.nuls.consensus.entity.Consensus;
 import io.nuls.consensus.entity.block.BlockData;
-import io.nuls.consensus.entity.block.BlockRoundData;
 import io.nuls.consensus.entity.member.Agent;
 import io.nuls.consensus.entity.member.Delegate;
 import io.nuls.core.chain.entity.*;
@@ -15,10 +14,9 @@ import io.nuls.core.context.NulsContext;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.log.Log;
-import io.nuls.db.entity.BlockPo;
+import io.nuls.db.entity.BlockHeaderPo;
 import io.nuls.db.entity.DelegateAccountPo;
 import io.nuls.db.entity.DelegatePo;
-import io.nuls.db.entity.TransactionPo;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,37 +30,31 @@ public class ConsensusTool {
 
     private static AccountService accountService = NulsContext.getInstance().getService(AccountService.class);
 
-    public static final BlockPo toPojo(Block block) {
-        BlockPo po = new BlockPo();
-        if (null != block.getVersion()) {
-            po.setVarsion((int) block.getVersion().getVersion());
+    public static final BlockHeaderPo toPojo(BlockHeader header) {
+        BlockHeaderPo po = new BlockHeaderPo();
+        po.setTxcount(header.getTxCount());
+        if (header.getHeight() > 1) {
+            po.setPreHash(header.getPreHash().getDigestHex());
         }
-        try {
-            po.setBytes(block.serialize());
-        } catch (IOException e) {
-            Log.error(e);
+        po.setMerkleHash(header.getMerkleHash().getDigestHex());
+        po.setHeight(header.getHeight());
+        po.setCreateTime(header.getTime());
+        po.setHash(header.getHash().getDigestHex());
+        if (null != header.getSign()) {
+            po.setSign(header.getSign().getSignBytes());
         }
-        po.setTxcount(block.getHeader().getTxCount());
-        if (block.getHeader().getHeight() > 1) {
-            po.setPreHash(block.getHeader().getPreHash().getDigestHex());
-        }
-        po.setMerkleHash(block.getHeader().getMerkleHash().getDigestHex());
-        po.setHeight(block.getHeader().getHeight());
-        po.setCreateTime(block.getHeader().getTime());
-        po.setHash(block.getHeader().getHash().getDigestHex());
-        po.setSign(block.getHeader().getSign().getSignBytes());
-        po.setTxcount(block.getHeader().getTxCount());
-        po.setConsensusAddress(block.getHeader().getPackingAddress());
+        po.setTxcount(header.getTxCount());
+        po.setConsensusAddress(header.getPackingAddress());
         return po;
     }
 
-    public static final Block fromPojo(BlockPo po) throws NulsException {
+    public static final BlockHeader fromPojo(BlockHeaderPo po) {
         if (null == po) {
             return null;
         }
-        Block block = new Block();
-        block.parse(po.getBytes());
-        return block;
+        BlockHeader header = new BlockHeader();
+        //todo
+        return header;
     }
 
     public static Consensus<Agent> fromPojo(DelegateAccountPo po) {
@@ -72,10 +64,11 @@ public class ConsensusTool {
         Agent agent = new Agent();
         agent.setStatus(ConsensusStatusEnum.WAITING.getCode());
         agent.setDeposit(Na.valueOf(po.getDeposit()));
-        agent.setCommissionRate(PocConsensusConstant.DEFAULT_COMMISSION_RATE);
-        agent.setDelegateAddress(po.getPeerAddress());
+        agent.setCommissionRate(po.getCommissionRate());
+        agent.setDelegateAddress(po.getNodeAddress());
         agent.setIntroduction(po.getRemark());
         agent.setStartTime(po.getStartTime());
+        agent.setStatus(po.getStatus());
         Consensus<Agent> ca = new Consensus<>();
         ca.setAddress(po.getAddress());
         ca.setExtend(agent);
@@ -92,7 +85,7 @@ public class ConsensusTool {
         delegate.setDelegateAddress(po.getAgentAddress());
         delegate.setDeposit(Na.valueOf(po.getDeposit()));
         delegate.setStartTime(po.getTime());
-        delegate.setId(po.getId());
+        delegate.setHash(po.getId());
         ca.setExtend(delegate);
         return ca;
     }
@@ -106,8 +99,9 @@ public class ConsensusTool {
         po.setDeposit(bean.getExtend().getDeposit().getValue());
         po.setStartTime(bean.getExtend().getStartTime());
         po.setRemark(bean.getExtend().getIntroduction());
-        po.setPeerAddress(bean.getExtend().getDelegateAddress());
+        po.setNodeAddress(bean.getExtend().getDelegateAddress());
         po.setId(bean.getAddress());
+        po.setStatus(bean.getExtend().getStatus());
         return po;
     }
 
@@ -120,12 +114,12 @@ public class ConsensusTool {
         po.setDeposit(bean.getExtend().getDeposit().getValue());
         po.setTime(bean.getExtend().getStartTime());
         po.setAgentAddress(bean.getExtend().getDelegateAddress());
-        po.setId(bean.getExtend().getId());
+        po.setId(bean.getExtend().getHash());
         return po;
     }
 
-    public static Block createBlock(BlockData blockData ) {
-        Account account = accountService.getLocalAccount();
+    public static Block createBlock(BlockData blockData) {
+        Account account = accountService.getDefaultAccount();
         if (null == account) {
             throw new NulsRuntimeException(ErrorCode.ACCOUNT_NOT_EXIST);
         }

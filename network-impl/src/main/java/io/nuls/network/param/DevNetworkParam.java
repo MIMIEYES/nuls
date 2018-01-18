@@ -1,6 +1,6 @@
 package io.nuls.network.param;
 
-import io.nuls.core.utils.cfg.ConfigLoader;
+import io.nuls.network.NetworkContext;
 import io.nuls.network.constant.NetworkConstant;
 import io.nuls.network.entity.param.AbstractNetworkParam;
 import io.nuls.network.filter.impl.DefaultMessageFilter;
@@ -17,18 +17,19 @@ public class DevNetworkParam extends AbstractNetworkParam {
     private static DevNetworkParam instance;
 
     private DevNetworkParam() {
-        super();
-        this.port = ConfigLoader.getPropValue(NetworkConstant.NETWORK_PORT_DEV, 8003);
-        this.packetMagic = ConfigLoader.getPropValue(NetworkConstant.NETWORK_MAGIC_DEV, 987654323);
+        this.maxInCount = NetworkContext.getNetworkConfig().getPropValue(NetworkConstant.NETWORK_NODE_MAX_IN, 20);
+        this.maxOutCount = NetworkContext.getNetworkConfig().getPropValue(NetworkConstant.NETWORK_NODE_MAX_OUT, 10);
+        this.port = 8003;
+        this.packetMagic = 987654323;
 
         InetSocketAddress address2 = new InetSocketAddress("192.168.1.197", port);
         InetSocketAddress address3 = new InetSocketAddress("192.168.1.248", port);
         InetSocketAddress address1 = new InetSocketAddress("192.168.1.199", port);
         InetSocketAddress address0 = new InetSocketAddress("192.168.1.249", port);
-        seedPeers.add(address1);
-        seedPeers.add(address2);
-        seedPeers.add(address3);
-        seedPeers.add(address0);
+        seedNodes.add(address1);
+        seedNodes.add(address2);
+        seedNodes.add(address3);
+        seedNodes.add(address0);
 
         this.messageFilter = DefaultMessageFilter.getInstance();
         this.messageHandlerFactory = DefaultNetWorkEventHandlerFactory.getInstance();

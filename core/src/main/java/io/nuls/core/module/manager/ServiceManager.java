@@ -2,6 +2,7 @@ package io.nuls.core.module.manager;
 
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.exception.NulsRuntimeException;
+import io.nuls.core.utils.aop.AopUtils;
 import io.nuls.core.utils.log.Log;
 
 import java.util.HashMap;
@@ -38,7 +39,9 @@ public class ServiceManager {
             return;
         }
         if (index >= WAIT_TIMES) {
-            throw new NulsRuntimeException(ErrorCode.FAILED, "dependency module is not ready!" + tclass);
+//            throw new NulsRuntimeException(ErrorCode.FAILED, "dependency module is not ready!" + tclass);
+            //todo 记录哪个对象的哪个字段，最后赋值
+        return ;
         }
         sleepAndIncrement(tclass,index);
     }

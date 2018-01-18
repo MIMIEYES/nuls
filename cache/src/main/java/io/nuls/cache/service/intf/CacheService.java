@@ -1,7 +1,6 @@
 package io.nuls.cache.service.intf;
 
 import io.nuls.cache.entity.CacheElement;
-import io.nuls.core.chain.intf.NulsCloneable;
 
 import java.util.List;
 import java.util.Map;
@@ -11,14 +10,14 @@ import java.util.Set;
  * @author Niels
  * @date 2017/10/18
  */
-public interface CacheService<K, V extends NulsCloneable> {
+public interface CacheService<K, V> {
 
     /**
      * create a cache named title
      *
      * @param title
      */
-    void createCache(String title);
+    void createCache(String title,int heapMb);
 
     /**
      * create a cache named title by configurations
@@ -28,7 +27,8 @@ public interface CacheService<K, V extends NulsCloneable> {
      */
     void createCache(String title, Map<String, Object> initParams);
 
-    void createCache(String title, int timeToLiveSeconds, int timeToIdleSeconds);
+    void createCache(String title, int heapMb, int timeToLiveSeconds, int timeToIdleSeconds);
+
 
     /**
      * remove a cache by title
@@ -44,18 +44,14 @@ public interface CacheService<K, V extends NulsCloneable> {
      * @param key
      * @param value
      */
-    void putElement(String cacheTitle, K key, V value);
-
-    void putElementWithoutClone(String cacheTitle, K key, Object value);
-
+    void putElement(String cacheTitle, K key, Object value);
 
     /**
      * put data to a cache
      *
-     * @param cacheTitle
      * @param element
      */
-    void putElement(String cacheTitle, CacheElement element);
+    void putElement(CacheElement element);
 
     /**
      * get data from the cache named cacheTitle
@@ -64,13 +60,10 @@ public interface CacheService<K, V extends NulsCloneable> {
      * @param key
      * @return
      */
-    V getElementValue(String cacheTitle, K key);
+    V getElement(String cacheTitle, K key);
 
-    V getElementValueWithOutClone(String cacheTitle, K key);
+    List<V> getElementList(String cacheTitle);
 
-    List<V> getElementValueList(String cacheTitle);
-
-    List<V> getElementValueListWithOutClone(String cacheTitle);
     /**
      * remove an element from the cache named cacheTitle
      *

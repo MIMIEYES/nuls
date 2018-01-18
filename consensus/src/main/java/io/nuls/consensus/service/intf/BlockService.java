@@ -1,33 +1,40 @@
 package io.nuls.consensus.service.intf;
 
 import io.nuls.core.chain.entity.Block;
+import io.nuls.core.chain.entity.BlockHeader;
+import io.nuls.core.chain.entity.NulsDigestData;
 import io.nuls.core.exception.NulsException;
 
+import java.io.IOException;
+import java.util.List;
+
 /**
- *
  * @author Niels
  * @date 2017/11/10
- *
  */
 public interface BlockService {
 
-    Block getGengsisBlockFromDb();
+    Block getGengsisBlock();
 
     long getLocalHeight();
 
     Block getLocalBestBlock();
 
-    Block getBlockByHash(String hash);
+    BlockHeader getBlockHeader(long height);
 
-    Block getBlockByHeight(long height);
+    Block getBlock(String hash);
 
-    void save(Block block);
+    Block getBlock(long height);
 
-    void clearLocalBlocks();
+    List<Block> getBlockList(long startHeight, long endHeight);
 
-    void rollback(long height) throws NulsException;
+    void saveBlock(Block block) throws IOException;
 
-    int queryBlockCount(String address, long roundStart, long index);
+    void rollbackBlock(long height) throws NulsException;
 
-    int querySumOfYellowPunishRound(String localAccountAddress);
+    int getBlockCount(String address, long roundStart, long index);
+
+    List<NulsDigestData> getBlockHashList(long start, long end, long split);
+
+    BlockHeader getBlockHeader(NulsDigestData hash);
 }

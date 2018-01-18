@@ -13,10 +13,7 @@ import io.nuls.consensus.entity.params.QueryConsensusAccountParam;
 import io.nuls.consensus.entity.tx.PocExitConsensusTransaction;
 import io.nuls.consensus.entity.tx.PocJoinConsensusTransaction;
 import io.nuls.consensus.entity.tx.RegisterAgentTransaction;
-import io.nuls.consensus.event.ExitConsensusEvent;
-import io.nuls.consensus.event.JoinConsensusEvent;
-import io.nuls.consensus.event.RegisterAgentEvent;
-import io.nuls.consensus.service.cache.ConsensusCacheService;
+import io.nuls.consensus.cache.manager.member.ConsensusCacheManager;
 import io.nuls.consensus.service.intf.BlockService;
 import io.nuls.consensus.service.intf.ConsensusService;
 import io.nuls.core.chain.entity.Na;
@@ -28,9 +25,11 @@ import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.str.StringUtils;
-import io.nuls.event.bus.service.intf.NetworkEventBroadcaster;
+import io.nuls.core.validate.ValidateResult;
+import io.nuls.event.bus.service.intf.EventBroadcaster;
 import io.nuls.ledger.entity.params.Coin;
 import io.nuls.ledger.entity.params.CoinTransferData;
+import io.nuls.ledger.event.TransactionEvent;
 import io.nuls.ledger.service.intf.LedgerService;
 
 import java.io.IOException;
@@ -46,10 +45,10 @@ public class PocConsensusServiceImpl implements ConsensusService {
 
     private static final ConsensusService INSTANCE = new PocConsensusServiceImpl();
     private AccountService accountService = NulsContext.getInstance().getService(AccountService.class);
-    private NetworkEventBroadcaster networkEventBroadcaster = NulsContext.getInstance().getService(NetworkEventBroadcaster.class);
+    private EventBroadcaster eventBroadcaster = NulsContext.getInstance().getService(EventBroadcaster.class);
     private LedgerService ledgerService = NulsContext.getInstance().getService(LedgerService.class);
     private BlockService blockService = NulsContext.getInstance().getService(BlockService.class);
-    private ConsensusCacheService consensusCacheService = ConsensusCacheService.getInstance();
+    private ConsensusCacheManager consensusCacheManager = ConsensusCacheManager.getInstance();
 
     private PocConsensusServiceImpl() {
     }
@@ -59,7 +58,7 @@ public class PocConsensusServiceImpl implements ConsensusService {
     }
 
     private void registerAgent(Agent agent, Account account, String password) throws IOException {
-        RegisterAgentEvent event = new RegisterAgentEvent();
+        TransactionEvent event = new TransactionEvent();
         CoinTransferData data = new CoinTransferData();
         data.setFee(this.getTxFee(TransactionConstant.TX_TYPE_REGISTER_AGENT));
 
@@ -71,25 +70,26 @@ public class PocConsensusServiceImpl implements ConsensusService {
         coin.setUnlockTime(0);
         coin.setNa(agent.getDeposit());
         data.addTo(account.getAddress().toString(), coin);
-        RegisterAgentTransaction tx = new RegisterAgentTransaction(data, password);
+        RegisterAgentTransaction tx = null;
+        try {
+            tx = new RegisterAgentTransaction(data, password);
+        } catch (NulsException e) {
+            Log.error(e);
+            throw new NulsRuntimeException(e);
+        }
         Consensus<Agent> con = new Consensus<>();
         con.setAddress(account.getAddress().toString());
         con.setExtend(agent);
         tx.setTxData(con);
         tx.setHash(NulsDigestData.calcDigestData(tx.serialize()));
         tx.setSign(accountService.signData(tx.getHash(), account, password));
-        try {
-            ledgerService.verifyAndCacheTx(tx);
-        } catch (NulsException e) {
-            Log.error(e);
-            throw new NulsRuntimeException(e);
-        }
+        tx.verifyWithException();
         event.setEventBody(tx);
-        networkEventBroadcaster.broadcastHashAndCache(event);
+        eventBroadcaster.broadcastHashAndCache(event, true);
     }
 
     private void joinTheConsensus(Account account, String password, double amount, String agentAddress) throws IOException {
-        JoinConsensusEvent event = new JoinConsensusEvent();
+        TransactionEvent event = new TransactionEvent();
         PocJoinConsensusTransaction tx = new PocJoinConsensusTransaction();
         Consensus<Delegate> ca = new Consensus<>();
         ca.setAddress(account.getAddress().toString());
@@ -100,19 +100,14 @@ public class PocConsensusServiceImpl implements ConsensusService {
         tx.setTxData(ca);
         tx.setHash(NulsDigestData.calcDigestData(tx.serialize()));
         tx.setSign(accountService.signData(tx.getHash(), account, password));
-        try {
-            ledgerService.verifyAndCacheTx(tx);
-        } catch (NulsException e) {
-            Log.error(e);
-            throw new NulsRuntimeException(e);
-        }
+        tx.verifyWithException();
         event.setEventBody(tx);
-        networkEventBroadcaster.broadcastHashAndCache(event);
+        eventBroadcaster.broadcastHashAndCache(event, true);
     }
 
     @Override
-    public void exitConsensus(NulsDigestData joinTxHash, String password) {
-        PocJoinConsensusTransaction joinTx = (PocJoinConsensusTransaction) ledgerService.getTransaction(joinTxHash);
+    public void stopConsensus(NulsDigestData joinTxHash, String password) {
+        PocJoinConsensusTransaction joinTx = (PocJoinConsensusTransaction) ledgerService.getTx(joinTxHash);
         if (null == joinTx) {
             throw new NulsRuntimeException(ErrorCode.ACCOUNT_NOT_EXIST, "address:" + joinTx.getTxData().getAddress().toString());
         }
@@ -123,7 +118,7 @@ public class PocConsensusServiceImpl implements ConsensusService {
         if (!account.validatePassword(password)) {
             throw new NulsRuntimeException(ErrorCode.PASSWORD_IS_WRONG);
         }
-        ExitConsensusEvent event = new ExitConsensusEvent();
+        TransactionEvent event = new TransactionEvent();
         PocExitConsensusTransaction tx = new PocExitConsensusTransaction();
         tx.setTxData(joinTxHash);
         try {
@@ -134,26 +129,23 @@ public class PocConsensusServiceImpl implements ConsensusService {
         }
         tx.setSign(accountService.signData(tx.getHash(), account, password));
         event.setEventBody(tx);
-        networkEventBroadcaster.broadcastHashAndCache(event);
+        eventBroadcaster.broadcastHashAndCache(event, true);
     }
 
     @Override
-    public List<Consensus> getConsensusAccountList(String address, String agentAddress) {
-        QueryConsensusAccountParam param = new QueryConsensusAccountParam();
-        param.setAddress(address);
-        param.setAgentAddress(agentAddress);
-        List<Consensus<Agent>> list = consensusCacheService.getCachedAgentList(ConsensusStatusEnum.IN);
+    public List<Consensus> getConsensusAccountList() {
+        List<Consensus<Agent>> list = consensusCacheManager.getCachedAgentList(ConsensusStatusEnum.IN);
         List<Consensus> resultList = new ArrayList<>(list);
-        resultList.addAll(consensusCacheService.getCachedDelegateList());
+        resultList.addAll(consensusCacheManager.getCachedDelegateList(ConsensusStatusEnum.IN));
         return resultList;
     }
 
     @Override
     public ConsensusStatusInfo getConsensusInfo(String address) {
         if (StringUtils.isBlank(address)) {
-            address = this.accountService.getDefaultAccount();
+            address = this.accountService.getDefaultAccount().getAddress().getBase58();
         }
-        return consensusCacheService.getConsensusStatusInfo(address);
+        return consensusCacheManager.getConsensusStatusInfo(address);
     }
 
     @Override
@@ -168,7 +160,7 @@ public class PocConsensusServiceImpl implements ConsensusService {
     }
 
     @Override
-    public void joinConsensus(String address, String password, Map<String, Object> paramsMap) {
+    public void startConsensus(String address, String password, Map<String, Object> paramsMap) {
         Account account = this.accountService.getAccount(address);
         if (null == account) {
             throw new NulsRuntimeException(ErrorCode.FAILED, "The account is not exist,address:" + address);
