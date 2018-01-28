@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ * <p>
+ * Copyright (c) 2017-2018 nuls.io
+ * <p>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * <p>
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * <p>
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.thread;
 
 import io.nuls.consensus.constant.PocConsensusConstant;
@@ -12,6 +35,7 @@ import io.nuls.core.exception.NulsException;
 import io.nuls.core.exception.NulsRuntimeException;
 import io.nuls.core.utils.date.TimeService;
 import io.nuls.core.utils.log.Log;
+import io.nuls.core.validate.ValidateResult;
 
 import java.io.IOException;
 import java.util.List;
@@ -82,6 +106,9 @@ public class BlockMaintenanceThread implements Runnable {
                 break;
             }
             blockInfo = BEST_HEIGHT_FROM_NET.request(-1);
+            if (null == blockInfo) {
+                break;
+            }
             if (blockInfo.getBestHeight() > localBestBlock.getHeader().getHeight()) {
                 doit = true;
                 break;
@@ -107,25 +134,34 @@ public class BlockMaintenanceThread implements Runnable {
 
     public void checkGenesisBlock() throws IOException {
         Block genesisBlock = NulsContext.getInstance().getGenesisBlock();
-        genesisBlock.verify();
+        ValidateResult result = genesisBlock.verify();
+        if (result.isFailed()) {
+            throw new NulsRuntimeException(ErrorCode.DATA_ERROR, result.getMessage());
+        }
         Block localGenesisBlock = this.blockService.getGengsisBlock();
         if (null == localGenesisBlock) {
             this.blockService.saveBlock(genesisBlock);
             return;
         }
         localGenesisBlock.verify();
-        if (!localGenesisBlock.equals(genesisBlock)) {
+        String logicHash = genesisBlock.getHeader().getHash().getDigestHex();
+        String localHash = localGenesisBlock.getHeader().getHash().getDigestHex();
+        if (!logicHash.equals(localHash)) {
             throw new NulsRuntimeException(ErrorCode.DATA_ERROR);
         }
     }
 
     private Block getLocalBestCorrectBlock() {
         Block localBestBlock = this.blockService.getLocalBestBlock();
+        BlockInfo blockInfo = DistributedBlockInfoRequestUtils.getInstance().request(0);
+        if(null == blockInfo || blockInfo.getBestHash() == null){
+            return localBestBlock;
+        }
         do {
             if (null == localBestBlock || localBestBlock.getHeader().getHeight() <= 1) {
                 break;
             }
-            BlockInfo blockInfo = DistributedBlockInfoRequestUtils.getInstance().request(localBestBlock.getHeader().getHeight());
+            blockInfo = DistributedBlockInfoRequestUtils.getInstance().request(localBestBlock.getHeader().getHeight());
             if (null == blockInfo || blockInfo.getBestHash() == null) {
                 //本地高度最高，查询网络最新高度，并回退
                 rollbackBlock(localBestBlock.getHeader().getHeight());
@@ -150,8 +186,8 @@ public class BlockMaintenanceThread implements Runnable {
             return;
         }
         long height = startHeight - 1;
-        if (height < 1) {
-            throw new NulsRuntimeException(ErrorCode.NET_MESSAGE_ERROR, "Block data error!");
+        if (height < 0) {
+            return;
         }
         BlockInfo blockInfo = DistributedBlockInfoRequestUtils.getInstance().request(height);
         Block localBlock = this.blockService.getBlock(height);

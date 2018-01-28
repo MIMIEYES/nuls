@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.account.util;
 
 import io.nuls.account.entity.Account;
@@ -45,7 +68,6 @@ public final class AccountTool {
         account.setPriSeed(key.getPrivKeyBytes());
         account.setVersion(new NulsVersion((short) 0));
         account.setAddress(address);
-        account.setId(address.toString());
         account.setPubKey(key.getPubKey(true));
         account.setEcKey(key);
         account.setPriKey(key.getPrivKeyBytes());
@@ -77,35 +99,29 @@ public final class AccountTool {
         desc.setCreateTime(src.getCreateTime());
         desc.setVersion(new NulsVersion(src.getVersion()));
         try {
-            desc.setAddress(newAddress(src.getPubKey()));
+            desc.setAddress(Address.fromHashs(src.getAddress()));
         } catch (NulsException e) {
             Log.error(e);
         }
         desc.setAlias(src.getAlias());
         desc.setExtend(src.getExtend());
-        desc.setId(src.getId());
+        desc.setPriKey(src.getPriKey());
         desc.setPubKey(src.getPubKey());
-        desc.setPriKey(src.getPriKey().getBytes());
         desc.setPriSeed(src.getPriSeed());
         desc.setEcKey(ECKey.fromPrivate(new BigInteger(desc.getPriKey())));
         desc.setStatus(src.getStatus());
     }
 
-    private static Address newAddress(byte[] pubKey) throws NulsException {
-        return Address.fromHashs(Utils.sha256hash160(pubKey));
-    }
-
     public static void toPojo(Account src, AccountPo desc) {
         AssertUtil.canNotEmpty(src, "Object type conversion failed!");
         AssertUtil.canNotEmpty(desc, "Object type conversion failed!");
-        desc.setId(src.getId());
         desc.setAddress(src.getAddress().toString());
         desc.setAlias(src.getAlias());
         desc.setCreateTime(src.getCreateTime());
-        desc.setPubKey(src.getPubKey());
         desc.setVersion(src.getVersion().getVersion());
         desc.setExtend(src.getExtend());
-        desc.setPriKey(Hex.encode(src.getPriKey()));
+        desc.setPriKey(src.getPriKey());
+        desc.setPubKey(src.getPubKey());
         desc.setPriSeed(src.getPriSeed());
         desc.setStatus(src.getStatus());
     }

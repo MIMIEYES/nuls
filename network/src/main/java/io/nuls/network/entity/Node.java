@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.network.entity;
 
 import io.nuls.core.chain.entity.BaseNulsData;
@@ -15,6 +38,7 @@ import io.nuls.core.mesasge.NulsMessageHeader;
 import io.nuls.core.thread.manager.TaskManager;
 import io.nuls.core.utils.crypto.Hex;
 import io.nuls.core.utils.date.DateUtil;
+import io.nuls.core.utils.date.TimeService;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
 import io.nuls.core.utils.log.Log;
@@ -61,9 +85,11 @@ public class Node extends BaseNulsData {
 
     private Long lastTime;
 
+    private Long lastFailTime;
+
     private Integer failCount;
 
-    private Set<String> groupSet;
+    private Set<NodeGroup> groupSet;
 
     /**
      * 1: inNode ,  2: outNode
@@ -82,7 +108,6 @@ public class Node extends BaseNulsData {
     private volatile int status;
 
 
-
     private MessageWriter writeTarget;
 
     private VersionEvent versionMessage;
@@ -99,10 +124,10 @@ public class Node extends BaseNulsData {
 
     public Node(AbstractNetworkParam network) {
         super(OWN_MAIN_VERSION, OWN_SUB_VERSION);
-        this.groupSet = new HashSet<>();
         this.magicNumber = network.packetMagic();
         this.messageHandlerFactory = network.getMessageHandlerFactory();
         eventBusService = NulsContext.getInstance().getService(EventBusService.class);
+        this.groupSet = new HashSet<>();
     }
 
     public Node(AbstractNetworkParam network, int type) {
@@ -112,7 +137,7 @@ public class Node extends BaseNulsData {
 
 
     public Node(AbstractNetworkParam network, int type, InetSocketAddress socketAddress) {
-        this(network,type);
+        this(network, type);
         this.port = socketAddress.getPort();
         this.ip = socketAddress.getAddress().getHostAddress();
         this.hash = this.ip + this.port;
@@ -262,6 +287,7 @@ public class Node extends BaseNulsData {
     public void destroy() {
         lock.lock();
         try {
+            this.lastFailTime = TimeService.currentTimeMillis();
             this.status = Node.CLOSE;
             if (this.writeTarget != null) {
                 this.writeTarget.closeConnection();
@@ -325,17 +351,17 @@ public class Node extends BaseNulsData {
 
     @Override
     public String toString() {
-        StringBuffer buffer = new StringBuffer();
-        buffer.append("node:{");
-        buffer.append("ip: " + getIp() + ",");
-        buffer.append("port: " + getPort() + ",");
+        StringBuilder sb = new StringBuilder();
+        sb.append("{node:{");
+        sb.append("ip:' " + getIp() + "',");
+        sb.append("port: " + getPort() + ",");
         if (lastTime == null) {
             lastTime = System.currentTimeMillis();
         }
 
-        buffer.append("lastTime: " + DateUtil.convertDate(new Date(lastTime)) + ",");
-        buffer.append("magicNumber: " + magicNumber + "}");
-        return buffer.toString();
+        sb.append("lastTime: " + DateUtil.convertDate(new Date(lastTime)) + ",");
+        sb.append("magicNumber: " + magicNumber + "}}");
+        return sb.toString();
     }
 
     public int getType() {
@@ -399,6 +425,9 @@ public class Node extends BaseNulsData {
     }
 
     public Integer getFailCount() {
+        if (failCount == null) {
+            failCount = 0;
+        }
         return failCount;
     }
 
@@ -437,5 +466,36 @@ public class Node extends BaseNulsData {
             return false;
         }
         return other.getHash().equals(this.hash);
+    }
+
+    public void addToGroup(NodeGroup nodeGroup) {
+        if (nodeGroup != null) {
+            this.groupSet.add(nodeGroup);
+        }
+    }
+
+    public void removeFromGroup(NodeGroup nodeGroup) {
+        if (nodeGroup != null) {
+            this.groupSet.remove(nodeGroup);
+        }
+    }
+
+    public int getGroupCount(String groupName) {
+        return this.groupSet.size();
+    }
+
+    public Set<NodeGroup> getGroupSet() {
+        return this.groupSet;
+    }
+
+    public Long getLastFailTime() {
+        if(lastFailTime == null) {
+            lastFailTime = 0L;
+        }
+        return lastFailTime;
+    }
+
+    public void setLastFailTime(Long lastFailTime) {
+        this.lastFailTime = lastFailTime;
     }
 }

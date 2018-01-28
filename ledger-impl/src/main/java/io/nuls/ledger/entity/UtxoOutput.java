@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.ledger.entity;
 
 import io.nuls.core.chain.entity.BaseNulsData;
@@ -6,8 +29,10 @@ import io.nuls.core.chain.entity.Transaction;
 import io.nuls.core.crypto.VarInt;
 import io.nuls.core.crypto.script.Script;
 import io.nuls.core.exception.NulsException;
+import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.io.NulsByteBuffer;
 import io.nuls.core.utils.io.NulsOutputStreamBuffer;
+import io.nuls.core.utils.str.StringUtils;
 
 import java.io.IOException;
 
@@ -41,6 +66,9 @@ public class UtxoOutput extends BaseNulsData {
 
     private Transaction parent;
 
+    // key = txHash + "-" + index, a key that will not be serialized, only used for caching
+    private String key;
+
     public UtxoOutput() {
 
     }
@@ -52,18 +80,23 @@ public class UtxoOutput extends BaseNulsData {
     @Override
     public int size() {
         int s = 0;
+        s += Utils.sizeOfSerialize(txHash);
+        s += VarInt.sizeOf(index);
         s += VarInt.sizeOf(value);
+        s += Utils.sizeOfSerialize(address);
         s += VarInt.sizeOf(lockTime);
-        s += scriptBytes.length;
+        s += Utils.sizeOfSerialize(scriptBytes);
         return s;
     }
 
     @Override
     protected void serializeToStream(NulsOutputStreamBuffer stream) throws IOException {
+        stream.writeNulsData(txHash);
+        stream.writeVarInt(index);
         stream.writeInt64(value);
-        stream.writeInt32((int) lockTime);
-        stream.write(new VarInt(scriptBytes.length).encode());
-        stream.write(scriptBytes);
+        stream.writeBytesWithLength(address);
+        stream.writeInt64(lockTime);
+        stream.writeBytesWithLength(scriptBytes);
     }
 
     @Override
@@ -71,11 +104,12 @@ public class UtxoOutput extends BaseNulsData {
         if (byteBuffer == null) {
             return;
         }
+        txHash = byteBuffer.readHash();
+        index = (int) byteBuffer.readVarInt();
         value = byteBuffer.readInt64();
-        lockTime = byteBuffer.readUint32();
-        //赎回脚本名的长度
-        int signLength = (int) byteBuffer.readVarInt();
-        scriptBytes = byteBuffer.readBytes(signLength);
+        address = byteBuffer.readByLengthByte();
+        lockTime = byteBuffer.readInt64();
+        scriptBytes = byteBuffer.readByLengthByte();
         script = new Script(scriptBytes);
     }
 
@@ -136,7 +170,6 @@ public class UtxoOutput extends BaseNulsData {
         this.index = index;
     }
 
-
     public byte[] getAddress() {
         return address;
     }
@@ -159,5 +192,16 @@ public class UtxoOutput extends BaseNulsData {
 
     public void setParent(Transaction parent) {
         this.parent = parent;
+    }
+
+    public String getKey() {
+        if(StringUtils.isBlank(key)) {
+            key = this.getTxHash().getDigestHex() + "-" + index;
+        }
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
     }
 }

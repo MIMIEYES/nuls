@@ -1,5 +1,27 @@
+/**
+ * MIT License
+ * <p>
+ * Copyright (c) 2017-2018 nuls.io
+ * <p>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * <p>
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * <p>
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls;
-
 
 import io.nuls.core.MicroKernelBootstrap;
 import io.nuls.core.constant.NulsConstant;
@@ -23,7 +45,6 @@ import java.util.Map;
  */
 public class Bootstrap {
     private static final ModuleService moduleService = ModuleService.getInstance();
-    private MicroKernelBootstrap mk;
 
     public static void main(String[] args) {
         Thread.currentThread().setName("Nuls");
@@ -50,8 +71,10 @@ public class Bootstrap {
             } catch (InterruptedException e) {
                 Log.error(e);
             }
-            Log.info(ModuleManager.getInstance().getInfo());
-            Log.info("--------------------------------------------");
+//            Log.info(ModuleManager.getInstance().getInfo());
+            if(null!=NulsContext.getInstance().getBestBlock()){
+                Log.info("--------------------------------------------" + NulsContext.getInstance().getBestBlock().getHeader().getHeight());
+            }
         }
     }
 
@@ -69,14 +92,7 @@ public class Bootstrap {
         if (null == bootstrapClasses || bootstrapClasses.isEmpty()) {
             return;
         }
-        List<String> keyList = new ArrayList<>(bootstrapClasses.keySet());
-        for (String key : keyList) {
-            try {
-                moduleService.startModule(key, bootstrapClasses.get(key));
-            } catch (Exception e) {
-                throw new NulsRuntimeException(e);
-            }
-        }
+        moduleService.startModules(bootstrapClasses);
     }
 
     private static Map<String, String> getModuleBootstrapClass() throws NulsException {

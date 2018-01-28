@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.network.service.impl;
 
 
@@ -11,10 +34,11 @@ import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.network.IpUtil;
 import io.nuls.core.utils.str.StringUtils;
 import io.nuls.db.dao.NodeDataService;
+import io.nuls.db.entity.NodePo;
 import io.nuls.network.constant.NetworkConstant;
 import io.nuls.network.entity.Node;
 import io.nuls.network.entity.NodeGroup;
-import io.nuls.network.entity.NodeTransfer;
+import io.nuls.network.entity.NodeTransferTool;
 import io.nuls.network.entity.param.AbstractNetworkParam;
 import io.nuls.network.message.entity.PingEvent;
 
@@ -170,6 +194,7 @@ public class NodesManager implements Runnable {
             if (!nodeArea.get(areaName).containsKey(groupName)) {
                 throw new NulsRuntimeException(ErrorCode.NODE_GROUP_NOT_FOUND);
             }
+            addNode(node);
             if (areaName.equals(DEFAULT_AREA) && groupName.equals(NetworkConstant.NETWORK_NODE_OUT_GROUP) &&
                     nodeGroups.get(groupName).size() >= network.maxOutCount()) {
                 return;
@@ -179,7 +204,6 @@ public class NodesManager implements Runnable {
                 return;
             }
 
-            addNode(node);
             nodeArea.get(areaName).get(groupName).addNode(node);
         } finally {
             lock.unlock();
@@ -196,7 +220,7 @@ public class NodesManager implements Runnable {
         try {
             if (nodes.containsKey(nodeHash)) {
                 for (NodeGroup group : nodeGroups.values()) {
-                    for (Node node : group.getNodes()) {
+                    for (Node node : group.getNodes().values()) {
                         if (node.getHash().equals(nodeHash)) {
                             group.removeNode(node);
                             break;
@@ -206,7 +230,33 @@ public class NodesManager implements Runnable {
                 if (!isSeed(nodeHash)) {
                     Node node = nodes.get(nodeHash);
                     node.setFailCount(node.getFailCount() + 1);
-                    nodeDao.saveChange(NodeTransfer.toPojo(node));
+                    nodeDao.saveChange(NodeTransferTool.toPojo(node));
+                }
+                nodes.remove(nodeHash);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void blackNode(String nodeHash, int status) {
+        lock.lock();
+        try {
+            if (nodes.containsKey(nodeHash)) {
+                for (NodeGroup group : nodeGroups.values()) {
+                    for (Node node : group.getNodes().values()) {
+                        if (node.getHash().equals(nodeHash)) {
+                            group.removeNode(node);
+                            break;
+                        }
+                    }
+                }
+                if (!isSeed(nodeHash)) {
+                    Node node = nodes.get(nodeHash);
+                    node.setFailCount(node.getFailCount() + 1);
+                    NodePo po = NodeTransferTool.toPojo(node);
+                    po.setStatus(status);
+                    nodeDao.saveChange(po);
                 }
                 nodes.remove(nodeHash);
             }
@@ -272,7 +322,7 @@ public class NodesManager implements Runnable {
             }
 
             NodeGroup group = nodeGroups.get(groupName);
-            for (Node p : group.getNodes()) {
+            for (Node p : group.getNodes().values()) {
                 p.destroy();
                 group.removeNode(p);
             }
@@ -314,8 +364,8 @@ public class NodesManager implements Runnable {
 
     public List<Node> getAvailableNodesByGroup(String areaName, String groupName) {
         List<Node> availableNodes = new ArrayList<>();
-        if (hasNodeGroup(groupName)) {
-            for (Node node : getNodeGroup(groupName).getNodes()) {
+        if (hasNodeGroup(areaName,groupName)) {
+            for (Node node : getNodeGroup(areaName,groupName).getNodes().values()) {
                 if (node.getStatus() == Node.HANDSHAKE) {
                     availableNodes.add(node);
                 }
@@ -325,15 +375,7 @@ public class NodesManager implements Runnable {
     }
 
     public List<Node> getAvailableNodesByGroup(String groupName) {
-        List<Node> availableNodes = new ArrayList<>();
-        if (hasNodeGroup(groupName)) {
-            for (Node node : getNodeGroup(groupName).getNodes()) {
-                if (node.getStatus() == Node.HANDSHAKE) {
-                    availableNodes.add(node);
-                }
-            }
-        }
-        return availableNodes;
+        return  getAvailableNodesByGroup(DEFAULT_AREA, groupName);
     }
 
     public List<Node> getAvailableNodes(String excludeNodeId) {
@@ -387,7 +429,7 @@ public class NodesManager implements Runnable {
         }
         List<Node> availableNodes = new ArrayList<>();
         NodeGroup group = nodeArea.get(areaName).get(groupName);
-        for (Node node : group.getNodes()) {
+        for (Node node : group.getNodes().values()) {
             if (node.getStatus() == Node.HANDSHAKE && !node.getIp().equals(excludeNodeId)) {
                 availableNodes.add(node);
             }

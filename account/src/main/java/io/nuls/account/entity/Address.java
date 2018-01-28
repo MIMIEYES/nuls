@@ -1,49 +1,76 @@
+/**
+ * MIT License
+ * <p>
+ * Copyright (c) 2017-2018 nuls.io
+ * <p>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * <p>
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * <p>
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.account.entity;
 
-import io.nuls.core.crypto.Sha256Hash;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.utils.crypto.Base58;
 import io.nuls.core.utils.crypto.Hex;
+import io.nuls.core.utils.crypto.Utils;
 import io.nuls.core.utils.log.Log;
-
-import java.util.Arrays;
 
 /**
  * @author Niels
  * @date 2017/10/30
  */
 public class Address {
-    //base58 length
-    public static final int HASH_LENGTH = 25;
+    /**
+     *
+     */
+    public static final int HASH_LENGTH = 23;
+
     // RIPEMD160 length
     public static final int LENGTH = 20;
-    //content
+
+    /*
+    * hash160 of public key
+    */
     protected byte[] hash160;
 
-    //chain id
-    private int chainId = 0;
+    /**
+     * chain id
+     */
+    private short addressType = 0;
 
     public Address(String address) {
         try {
             byte[] bytes = Base58.decode(address);
 
             Address addressTmp = Address.fromHashs(bytes);
-            this.chainId = addressTmp.getChainId();
+            this.addressType = addressTmp.getAddressType();
             this.hash160 = addressTmp.getHash160();
         } catch (NulsException e) {
             Log.error(e);
         }
     }
 
-
-    public Address(Integer chainId, byte[] hash160) {
-        this.chainId = chainId;
+    public Address(short addressType, byte[] hash160) {
+        this.addressType = addressType;
         this.hash160 = hash160;
     }
 
-
-    public byte[] getHash160() {
+    private byte[] getHash160() {
         return hash160;
     }
 
@@ -52,12 +79,17 @@ public class Address {
         return getBase58();
     }
 
-    public int getChainId() {
-        return this.chainId;
+    public short getAddressType() {
+        return this.addressType;
     }
 
     public String getBase58() {
         return Base58.encode(getHash());
+    }
+
+    public static Address fromHashs(String address) throws NulsException {
+        byte[] bytes = Base58.decode(address);
+        return fromHashs(bytes);
     }
 
     public static Address fromHashs(byte[] hashs) throws NulsException {
@@ -65,44 +97,50 @@ public class Address {
             throw new NulsException(ErrorCode.DATA_ERROR);
         }
 
-        int chainId = hashs[0] & 0XFF;
+        short addressType = Utils.bytes2Short(hashs);
         byte[] content = new byte[LENGTH];
-        System.arraycopy(hashs, 1, content, 0, LENGTH);
+        System.arraycopy(hashs, 2, content, 0, LENGTH);
 
-        byte[] sign = new byte[4];
-        System.arraycopy(hashs, 21, sign, 0, 4);
+        byte[] sign = new byte[1];
+        System.arraycopy(hashs, 22, sign, 0, 1);
 
-        Address address = new Address(chainId, content);
-        address.checkSign(sign);
+        Address address = new Address(addressType, content);
+        address.checkXOR(sign[0]);
         return address;
     }
 
     public byte[] getHash() {
-        byte[] versionAndHash160 = new byte[21];
-        versionAndHash160[0] = (byte) chainId;
-        System.arraycopy(hash160, 0, versionAndHash160, 1, hash160.length);
-        byte[] checkSin = getCheckSign(versionAndHash160);
-        byte[] base58bytes = new byte[25];
-        System.arraycopy(versionAndHash160, 0, base58bytes, 0, versionAndHash160.length);
-        System.arraycopy(checkSin, 0, base58bytes, versionAndHash160.length, checkSin.length);
+        byte[] body = new byte[22];
+        System.arraycopy(Utils.shortToBytes(addressType), 0, body, 0, 2);
+        System.arraycopy(hash160, 0, body, 2, hash160.length);
+        byte xor = getXor(body);
+        byte[] base58bytes = new byte[23];
+        System.arraycopy(body, 0, base58bytes, 0, body.length);
+        base58bytes[body.length] = xor;
         return base58bytes;
     }
 
-    protected byte[] getCheckSign(byte[] versionAndHash160) {
-        byte[] checkSin = new byte[4];
-        System.arraycopy(Sha256Hash.hashTwice(versionAndHash160), 0, checkSin, 0, 4);
-        return checkSin;
+    protected byte getXor(byte[] body) {
+
+        byte xor = 0x00;
+        for (int i = 0; i < body.length; i++) {
+            xor ^= body[i];
+        }
+
+        return xor;
     }
 
-    protected void checkSign(byte[] sign) throws NulsException {
+    protected void checkXOR(byte xorByte) throws NulsException {
+        byte[] body = new byte[22];
+        System.arraycopy(Utils.shortToBytes(addressType), 0, body, 0, 2);
+        System.arraycopy(hash160, 0, body, 2, hash160.length);
 
-        byte[] versionAndHash160 = new byte[21];
-        versionAndHash160[0] = (byte) chainId;
-        System.arraycopy(hash160, 0, versionAndHash160, 1, hash160.length);
-        byte[] checkSin = new byte[4];
-        System.arraycopy(Sha256Hash.hashTwice(versionAndHash160), 0, checkSin, 0, 4);
+        byte xor = 0x00;
+        for (int i = 0; i < body.length; i++) {
+            xor ^= body[i];
+        }
 
-        if (!Arrays.equals(checkSin, sign)) {
+        if (xor != xorByte) {
             throw new NulsException(ErrorCode.DATA_ERROR);
         }
     }
@@ -116,4 +154,5 @@ public class Address {
     public String hashHex() {
         return Hex.encode(getHash());
     }
+
 }

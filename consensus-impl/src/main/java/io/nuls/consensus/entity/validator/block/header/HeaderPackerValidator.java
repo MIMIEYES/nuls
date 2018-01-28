@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ * <p>
+ * Copyright (c) 2017-2018 nuls.io
+ * <p>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * <p>
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * <p>
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.entity.validator.block.header;
 
 import io.nuls.consensus.entity.block.BlockRoundData;
@@ -20,7 +43,6 @@ import io.nuls.core.validate.ValidateResult;
 public class HeaderPackerValidator implements NulsDataValidator<BlockHeader> {
     private static final String ERROR_MESSAGE = "block header packer check failed";
     public static final HeaderPackerValidator INSTANCE = new HeaderPackerValidator();
-    private BlockService blockService = NulsContext.getInstance().getService(BlockService.class);
     private ConsensusManager consensusManager = ConsensusManager.getInstance();
 
     private HeaderPackerValidator() {
@@ -32,7 +54,11 @@ public class HeaderPackerValidator implements NulsDataValidator<BlockHeader> {
 
     @Override
     public ValidateResult validate(BlockHeader header) {
-        BlockHeader preHeader = blockService.getBlockHeader(header.getPreHash());
+        BlockHeader preHeader = NulsContext.getServiceBean(BlockService.class).getBlockHeader(header.getPreHash());
+        PocMeetingRound currentRound = consensusManager.getCurrentRound();
+        if (header.getHeight() == 0) {
+            return ValidateResult.getSuccessResult();
+        }
         BlockRoundData roundData = null;
         try {
             roundData = new BlockRoundData(preHeader.getExtend());
@@ -40,16 +66,16 @@ public class HeaderPackerValidator implements NulsDataValidator<BlockHeader> {
             Log.error(e);
             return ValidateResult.getSuccessResult();
         }
-        PocMeetingRound currentRound = consensusManager.getCurrentRound();
         if (currentRound.getIndex() == roundData.getRoundIndex() && currentRound.getMemberCount() > (roundData.getPackingIndexOfRound() + 1)) {
             if (currentRound.indexOf(header.getPackingAddress()) <= roundData.getPackingIndexOfRound()) {
                 return ValidateResult.getFailedResult(ERROR_MESSAGE);
             }
-        } else if (currentRound.getIndex() == (1 + roundData.getRoundIndex())) {
-            if (currentRound.getPreviousRound().indexOf(header.getPackingAddress()) <= roundData.getPackingIndexOfRound()) {
-                return ValidateResult.getFailedResult(ERROR_MESSAGE);
-            }
         }
+//TODO        else if (currentRound.getIndex() == (1 + roundData.getRoundIndex())) {
+//            if (currentRound.getPreviousRound().indexOf(header.getPackingAddress()) <= roundData.getPackingIndexOfRound()) {
+//                return ValidateResult.getFailedResult(ERROR_MESSAGE);
+//            }
+//        }
         BlockRoundData nowRoundData = null;
         try {
             nowRoundData = new BlockRoundData(header.getExtend());

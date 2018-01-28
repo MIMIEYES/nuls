@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.utils;
 
 import io.nuls.consensus.entity.BlockHashResponse;
@@ -22,7 +45,6 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author Niels
  * @date 2017/12/11
  */
-//todo 设置超时
 public class DistributedBlockInfoRequestUtils {
     private static final DistributedBlockInfoRequestUtils INSTANCE = new DistributedBlockInfoRequestUtils();
     private EventBroadcaster eventBroadcaster = NulsContext.getInstance().getService(EventBroadcaster.class);
@@ -68,7 +90,7 @@ public class DistributedBlockInfoRequestUtils {
         if (nodeIdList.isEmpty()) {
             Log.error("get best height from net faild!");
             lock.unlock();
-            throw new NulsRuntimeException(ErrorCode.NET_MESSAGE_ERROR, "broadcast faild!");
+            return null;
         }
         return this.getBlockInfo();
     }
@@ -81,14 +103,14 @@ public class DistributedBlockInfoRequestUtils {
         if (!requesting) {
             return false;
         }
-        if(hashesMap.get(nodeId)==null){
+        if (hashesMap.get(nodeId) == null) {
             hashesMap.put(nodeId, response);
-        }else{
+        } else {
             BlockHashResponse instance = hashesMap.get(nodeId);
             instance.merge(response);
-            hashesMap.put(nodeId,instance);
+            hashesMap.put(nodeId, instance);
         }
-        if(response.getHeightList().get(response.getHeightList().size()-1)<end){
+        if (response.getHeightList().get(response.getHeightList().size() - 1) < end) {
             return true;
         }
         String key = response.getHash().getDigestHex();

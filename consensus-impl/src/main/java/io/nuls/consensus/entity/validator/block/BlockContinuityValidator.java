@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.entity.validator.block;
 
 import io.nuls.consensus.constant.PocConsensusConstant;
@@ -15,7 +38,6 @@ import io.nuls.core.validate.ValidateResult;
 public class BlockContinuityValidator implements NulsDataValidator<Block> {
     private static final String ERROR_MESSAGE = "block continuity check failed";
     public static final BlockContinuityValidator INSTANCE = new BlockContinuityValidator();
-    private BlockService blockService = NulsContext.getInstance().getService(BlockService.class);
 
     private BlockContinuityValidator() {
     }
@@ -33,12 +55,12 @@ public class BlockContinuityValidator implements NulsDataValidator<Block> {
                 failed = !block.getHeader().getPreHash().equals(NulsDigestData.EMPTY_HASH);
                 break;
             }
-            Block preBlock = blockService.getBlock(block.getHeader().getHeight());
-            failed = preBlock.getHeader().getHash().equals(block.getHeader().getPreHash());
+            Block preBlock = NulsContext.getServiceBean(BlockService.class).getBlock(block.getHeader().getHeight()-1);
+            failed = !preBlock.getHeader().getHash().equals(block.getHeader().getPreHash());
             if(failed){
                 break;
             }
-            failed = preBlock.getHeader().getTime()==(block.getHeader().getTime()- PocConsensusConstant.BLOCK_TIME_INTERVAL*1000);
+            failed = preBlock.getHeader().getTime()>(block.getHeader().getTime()- PocConsensusConstant.BLOCK_TIME_INTERVAL*1000);
         } while (false);
 
         if (failed) {

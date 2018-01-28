@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.core.crypto.script;
 
 import io.nuls.core.crypto.ECKey;
@@ -18,13 +41,13 @@ import java.util.*;
 import static io.nuls.core.crypto.script.ScriptOpCodes.*;
 
 /**
- * <p>Programs embedded inside transactions that control redemption of payments.</p>
- * <p>
- * <p>Bitcoin transactions don't specify what they do directly. Instead <a href="https://en.bitcoin.it/wiki/Script">a
+ *Programs embedded inside transactions that control redemption of payments.</p>
+ *
+ *Bitcoin transactions don't specify what they do directly. Instead <a href="https://en.bitcoin.it/wiki/Script">a
  * small binary stack language</a> is used to define programs that when evaluated return whether the transaction
  * "accepts" or rejects the other transactions connected to it.</p>
- * <p>
- * <p>In SPV mode, scripts are not run, because that would require all transactions to be available and lightweight
+ *
+ *In SPV mode, scripts are not run, because that would require all transactions to be available and lightweight
  * clients don't have that data. In full mode, this class is used to run the interpreted language. It also has
  * static methods for building scripts.</p>
  */
@@ -155,10 +178,10 @@ public class Script {
     };
 
     /**
-     * <p>To run a script, first we parse it which breaks it up into chunks representing pushes of data or logical
+     *To run a script, first we parse it which breaks it up into chunks representing pushes of data or logical
      * opcodes. Then we can run the parsed chunks.</p>
-     * <p>
-     * <p>The reason for this split, instead of just interpreting directly, is to make it easier
+     *
+     *The reason for this split, instead of just interpreting directly, is to make it easier
      * to reach into a programs structure and pull out bits of data without having to run it.
      * This is necessary to render the to/from addresses of transactions in a user interface.
      * Bitcoin Core does something similar.</p>
@@ -283,15 +306,15 @@ public class Script {
     }
 
     /**
-     * <p>If a program matches the standard template DUP HASH160 &lt;pubkey hash&gt; EQUALVERIFY CHECKSIG
+     *If a program matches the standard template DUP HASH160 &lt;pubkey hash&gt; EQUALVERIFY CHECKSIG
      * then this function retrieves the third element.
      * In this case, this is useful for fetching the destination address of a transaction.</p>
      *
-     * <p>If a program matches the standard template HASH160 &lt;script hash&gt; EQUAL
+     *If a program matches the standard template HASH160 &lt;script hash&gt; EQUAL
      * then this function retrieves the second element.
      * In this case, this is useful for fetching the hash of the redeem script of a transaction.</p>
      *
-     * <p>Otherwise it throws a ScriptException.</p>
+     *Otherwise it throws a ScriptException.</p>
      *
      */
 //    public byte[] getPubKeyHash() throws ScriptException {
@@ -630,14 +653,14 @@ public class Script {
 //    }
 
     /**
-     * <p>Whether or not this is a scriptPubKey representing a pay-to-script-hash output. In such outputs, the logic that
+     *Whether or not this is a scriptPubKey representing a pay-to-script-hash output. In such outputs, the logic that
      * controls reclamation is not actually in the output at all. Instead there's just a hash, and it's up to the
      * spending input to provide a program matching that hash. This rule is "soft enforced" by the network as it does
      * not exist in Bitcoin Core. It means blocks containing P2SH transactions that don't match
      * correctly are considered valid, but won't be mined upon, so they'll be rapidly re-orgd out of the chain. This
      * logic is defined by <a href="https://github.com/bitcoin/bips/blob/master/bip-0016.mediawiki">BIP 16</a>.</p>
-     * <p>
-     * <p>bitcoinj does not support creation of P2SH transactions today. The goal of P2SH is to allow short addresses
+     *
+     *bitcoinj does not support creation of P2SH transactions today. The goal of P2SH is to allow short addresses
      * even for complex scripts (eg, multi-sig outputs) so they are convenient to work with in things like QRcodes or
      * with copy/paste, and also to minimize the size of the unspent output set (which improves performance of the
      * Bitcoin system).</p>

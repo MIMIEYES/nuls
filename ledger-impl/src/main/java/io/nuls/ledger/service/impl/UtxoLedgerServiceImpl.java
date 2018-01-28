@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.ledger.service.impl;
 
 import io.nuls.core.chain.entity.Na;
@@ -7,6 +30,7 @@ import io.nuls.core.chain.entity.Transaction;
 import io.nuls.core.chain.manager.TransactionManager;
 import io.nuls.core.constant.ErrorCode;
 import io.nuls.core.constant.TransactionConstant;
+import io.nuls.core.constant.TxStatusEnum;
 import io.nuls.core.context.NulsContext;
 import io.nuls.core.exception.NulsException;
 import io.nuls.core.tx.serivce.TransactionService;
@@ -64,6 +88,7 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         return INSTANCE;
     }
 
+    @Override
     public void init() {
         txDao = NulsContext.getInstance().getService(UtxoTransactionDataService.class);
         eventBroadcaster = NulsContext.getInstance().getService(EventBroadcaster.class);
@@ -137,11 +162,17 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         try {
             CoinTransferData coinData = new CoinTransferData(amount, address, toAddress);
             tx = UtxoTransactionTool.getInstance().createTransferTx(coinData, password, remark);
+            tx.verify();
             TransactionEvent event = new TransactionEvent();
             event.setEventBody(tx);
             eventBroadcaster.broadcastAndCacheAysn(event, true);
         } catch (Exception e) {
             Log.error(e);
+            try {
+                rollbackTx(tx);
+            } catch (NulsException e1) {
+                Log.error(e1);
+            }
             return new Result(false, e.getMessage());
         }
 
@@ -154,11 +185,17 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         try {
             CoinTransferData coinData = new CoinTransferData(amount, addressList, toAddress);
             tx = UtxoTransactionTool.getInstance().createTransferTx(coinData, password, remark);
+            tx.verify();
             TransactionEvent event = new TransactionEvent();
             event.setEventBody(tx);
             eventBroadcaster.broadcastAndCacheAysn(event, true);
         } catch (Exception e) {
             Log.error(e);
+            try {
+                rollbackTx(tx);
+            } catch (NulsException e1) {
+                Log.error(e1);
+            }
             return new Result(false, e.getMessage());
         }
 
@@ -167,17 +204,25 @@ public class UtxoLedgerServiceImpl implements LedgerService {
 
 
     @Override
-    public Result lock(String address, String password, Na amount, long unlockTime) {
+    public Result lock(String address, String password, Na amount, long unlockTime,String remark) {
         LockNulsTransaction tx = null;
         try {
             CoinTransferData coinData = new CoinTransferData(amount, address);
             coinData.addTo(address, new Coin(amount, unlockTime));
-            tx = UtxoTransactionTool.getInstance().createLockNulsTx(coinData, password);
+            tx = UtxoTransactionTool.getInstance().createLockNulsTx(coinData, password,remark);
+
+            tx.verify();
             TransactionEvent event = new TransactionEvent();
             event.setEventBody(tx);
             eventBroadcaster.broadcastAndCacheAysn(event, true);
 
         } catch (Exception e) {
+            Log.error(e);
+            try {
+                rollbackTx(tx);
+            } catch (NulsException e1) {
+                Log.error(e1);
+            }
             return new Result(false, e.getMessage());
         }
 
@@ -213,9 +258,10 @@ public class UtxoLedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public List<Transaction> getListByAddress(String address, int txType, int pageNumber, int pageSize) throws Exception {
+    public List<Transaction> getTxList(String address, int txType, int pageNumber, int pageSize) throws Exception {
         List<Transaction> txList = new ArrayList<>();
-        List<TransactionPo> poList = txDao.getTxs(address, txType, pageNumber, pageSize, true);
+        boolean isLocal = NulsContext.LOCAL_ADDRESS_LIST.contains(address);
+        List<TransactionPo> poList = txDao.getTxs(address, txType, pageNumber, pageSize, isLocal);
 
         for (TransactionPo po : poList) {
             txList.add(TransactionPoTool.toTransaction(po));
@@ -224,9 +270,11 @@ public class UtxoLedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public List<Transaction> getListByBlockHash(String blockHash) throws Exception {
+    public List<Transaction> getTxList(String address, int txType) throws Exception {
         List<Transaction> txList = new ArrayList<>();
-        List<TransactionPo> poList = txDao.getTxs(blockHash, true);
+        boolean isLocal = NulsContext.LOCAL_ADDRESS_LIST.contains(address);
+        List<TransactionPo> poList = txDao.getTxs(address, txType, isLocal);
+
         for (TransactionPo po : poList) {
             txList.add(TransactionPoTool.toTransaction(po));
         }
@@ -234,9 +282,9 @@ public class UtxoLedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public List<Transaction> getListByHeight(long startHeight, long endHeight) throws Exception {
+    public List<Transaction> getTxList(String blockHash) throws Exception {
         List<Transaction> txList = new ArrayList<>();
-        List<TransactionPo> poList = txDao.getTxs(startHeight, endHeight, true);
+        List<TransactionPo> poList = txDao.getTxs(blockHash, false);
         for (TransactionPo po : poList) {
             txList.add(TransactionPoTool.toTransaction(po));
         }
@@ -244,9 +292,19 @@ public class UtxoLedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public List<Transaction> getListByHeight(long height) throws Exception {
+    public List<Transaction> getTxList(long startHeight, long endHeight) throws Exception {
         List<Transaction> txList = new ArrayList<>();
-        List<TransactionPo> poList = txDao.getTxs(height, true);
+        List<TransactionPo> poList = txDao.getTxs(startHeight, endHeight, false);
+        for (TransactionPo po : poList) {
+            txList.add(TransactionPoTool.toTransaction(po));
+        }
+        return txList;
+    }
+
+    @Override
+    public List<Transaction> getTxList(long height) throws Exception {
+        List<Transaction> txList = new ArrayList<>();
+        List<TransactionPo> poList = txDao.getTxs(height, false);
         for (TransactionPo po : poList) {
             txList.add(TransactionPoTool.toTransaction(po));
         }
@@ -260,6 +318,7 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         for (TransactionService service : serviceList) {
             service.onRollback(tx);
         }
+        tx.setStatus(TxStatusEnum.CACHED);
     }
 
     @Override
@@ -268,7 +327,7 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         List<TransactionService> serviceList = getServiceList(tx.getClass());
         for (TransactionService service : serviceList) {
             service.onCommit(tx);
-        }
+        }tx.setStatus(TxStatusEnum.CONFIRMED);
     }
 
     @Override
@@ -278,6 +337,19 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         for (TransactionService service : serviceList) {
             service.onApproval(tx);
         }
+        tx.setStatus(TxStatusEnum.AGREED);
+    }
+
+    @Override
+    public void deleteTx(Transaction tx) {
+        // todo auto-generated method stub(niels)
+
+    }
+
+    @Override
+    public void deleteTx(long blockHeight) {
+        // todo auto-generated method stub(niels)
+
     }
 
     public List<TransactionService> getServiceList(Class<? extends Transaction> txClass) {
@@ -292,6 +364,4 @@ public class UtxoLedgerServiceImpl implements LedgerService {
         }
         return list;
     }
-
-
 }

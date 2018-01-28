@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.network.service.impl;
 
 import io.nuls.core.constant.ErrorCode;
@@ -155,6 +178,9 @@ public class ConnectionManager implements Runnable {
             InetSocketAddress socketAddress = new InetSocketAddress(node.getIp(), node.getPort());
             channel.connect(socketAddress);
             PendingConnect data = new PendingConnect(channel, node);
+            if(channel == null) {
+                System.out.println("----------------channel is null");
+            }
             SelectionKey key = channel.register(selector, SelectionKey.OP_CONNECT);
             key.attach(data);
             selector.wakeup();
@@ -176,11 +202,11 @@ public class ConnectionManager implements Runnable {
         //check the connecting nodes count
         boolean inAble = true;
         boolean outAble = true;
-        NodeGroup inNodes = nodesManager.getNodeGroup("inNodes");
+        NodeGroup inNodes = nodesManager.getNodeGroup(NetworkConstant.NETWORK_NODE_IN_GROUP);
         if (inNodes.size() >= network.maxInCount()) {
             inAble = false;
         }
-        NodeGroup outNodes = nodesManager.getNodeGroup("inNodes");
+        NodeGroup outNodes = nodesManager.getNodeGroup(NetworkConstant.NETWORK_NODE_OUT_GROUP);
         if (outNodes.size() >= network.maxOutCount()) {
             outAble = false;
         }
@@ -192,14 +218,14 @@ public class ConnectionManager implements Runnable {
             return false;
         }
         //check it already connected
-        for (Node node : inNodes.getNodes()) {
+        for (Node node : inNodes.getNodes().values()) {
             if (node.getIp().equals(socketAddress.getAddress().getHostAddress()) &&
                     node.getPort() == socketAddress.getPort()) {
                 return false;
             }
         }
 
-        for (Node node : outNodes.getNodes()) {
+        for (Node node : outNodes.getNodes().values()) {
             if (node.getIp().equals(socketAddress.getAddress().getHostAddress()) &&
                     node.getPort() == socketAddress.getPort()) {
                 return false;
@@ -272,6 +298,7 @@ public class ConnectionManager implements Runnable {
             newKey.attach(handler);
             node.connectionOpened();
         } catch (Exception e) {
+            Log.error(e);
             if (socketChannel != null) {
                 Log.warn("in node Failed to connect" + node.getIp());
                 try {

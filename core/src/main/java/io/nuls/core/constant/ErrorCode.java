@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.core.constant;
 
 
@@ -29,7 +52,7 @@ public enum ErrorCode {
     DATA_SIZE_ERROR("SYS014", 10014),
     DATA_FIELD_CHECK_ERROR("SYS015", 10015),
     CONFIG_ERROR("SYS016", 10016),
-
+    MODULE_LOAD_TIME_OUT("SYS017", 10017),
     /**
      * ----------  Consensus Network code   ---------
      */
@@ -43,9 +66,10 @@ public enum ErrorCode {
     NET_MESSAGE_LENGTH_ERROR("NET004", 40004),
     NET_P2P_UNKOWN_EXCEPTION("NET005", 40005),
     NODE_GROUP_ALREADY_EXISTS("NET006", 40006),
-    NODE_GROUP_NOT_FOUND("NET007", 40007),
-    NODE_AREA_NOT_FOUND("NET008", 40008),
-    NODE_NOT_FOUND("NET009", 40009),
+    NODE_AREA_ALREADY_EXISTS("NET007", 40007),
+    NODE_GROUP_NOT_FOUND("NET008", 40008),
+    NODE_AREA_NOT_FOUND("NET009", 40009),
+    NODE_NOT_FOUND("NET010", 40010),
 
     /**
      * ---- direct Exception code---
@@ -99,8 +123,8 @@ public enum ErrorCode {
     /**
      * ------------  Ledger Exception code   --------------
      */
-    BALANCE_NOT_ENOUGH("LED001", 70001);
-
+    BALANCE_NOT_ENOUGH("LED001", 70001),
+    UTXO_STATUS_CHANGE("LED002", 700002);
 
     private final int msg;
     private final String code;

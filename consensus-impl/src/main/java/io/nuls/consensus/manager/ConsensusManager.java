@@ -1,5 +1,29 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.manager;
 
+import io.nuls.account.entity.Account;
 import io.nuls.account.service.intf.AccountService;
 import io.nuls.consensus.cache.manager.block.BlockCacheManager;
 import io.nuls.consensus.cache.manager.member.ConsensusCacheManager;
@@ -19,6 +43,7 @@ import io.nuls.core.chain.entity.Block;
 import io.nuls.core.chain.entity.Transaction;
 import io.nuls.core.constant.NulsConstant;
 import io.nuls.core.context.NulsContext;
+import io.nuls.core.thread.BaseThread;
 import io.nuls.core.thread.manager.TaskManager;
 import io.nuls.core.utils.log.Log;
 import io.nuls.core.utils.str.StringUtils;
@@ -29,11 +54,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- *
  * @author Niels
  * @date 2018/1/8
  */
-public class ConsensusManager {
+public class ConsensusManager implements Runnable {
     private static ConsensusManager INSTANCE = new ConsensusManager();
     private BlockCacheManager blockCacheManager;
     private ConsensusCacheManager consensusCacheManager;
@@ -43,7 +67,6 @@ public class ConsensusManager {
     private boolean partakePacking = false;
     private List<String> seedNodeList;
 
-    private String localAccountAddress;
     private PocMeetingRound currentRound;
     private ConsensusStatusInfo consensusStatusInfo;
 
@@ -57,7 +80,6 @@ public class ConsensusManager {
     private void loadConfigration() {
         NulsContext.getInstance().setGenesisBlock(GenesisBlock.getInstance());
         partakePacking = NulsContext.MODULES_CONFIG.getCfgValue(PocConsensusConstant.CFG_CONSENSUS_SECTION, PocConsensusConstant.PROPERTY_PARTAKE_PACKING, false);
-
         seedNodeList = new ArrayList<>();
         Set<String> seedAddressSet = new HashSet<>();
         String addresses = NulsContext.MODULES_CONFIG.getCfgValue(PocConsensusConstant.CFG_CONSENSUS_SECTION, PocConsensusConstant.PROPERTY_SEED_NODES, "");
@@ -77,8 +99,13 @@ public class ConsensusManager {
     public void init() {
         loadConfigration();
         accountService = NulsContext.getInstance().getService(AccountService.class);
-        localAccountAddress = accountService.getDefaultAccount().getAddress().getBase58();
-
+        List<Account> list = this.accountService.getAccountList();
+        boolean noneAccount = list == null || list.isEmpty();
+        if (this.partakePacking && noneAccount) {
+            Account account = this.accountService.createAccount();
+            this.accountService.setDefaultAccount(account.getAddress().getBase58());
+            NulsContext.LOCAL_ADDRESS_LIST.add(account.getAddress().getBase58());
+        }
         blockCacheManager = BlockCacheManager.getInstance();
         blockCacheManager.init();
         consensusCacheManager = ConsensusCacheManager.getInstance();
@@ -87,29 +114,58 @@ public class ConsensusManager {
         confirmingTxCacheManager.init();
         receivedTxCacheManager = ReceivedTxCacheManager.getInstance();
         receivedTxCacheManager.init();
+        TaskManager.createAndRunThread(NulsConstant.MODULE_ID_CONSENSUS, "consensus-status-manager", this);
+    }
 
+    @Override
+    public void run() {
         this.initConsensusStatusInfo();
     }
 
     public void initConsensusStatusInfo() {
-        ConsensusStatusInfo info = new ConsensusStatusInfo();
-        info.setAddress(localAccountAddress);
-        //consensus seed must partake packing
-        boolean isSeed = this.seedNodeList.contains(localAccountAddress);
-        if (isSeed) {
-            info.setStatus(ConsensusStatusEnum.IN.getCode());
-        } else {
-            Consensus<Agent> memberSelf =
-                    consensusCacheManager.getCachedAgent(localAccountAddress);
-            if (null == memberSelf) {
-                info.setStatus(ConsensusStatusEnum.NOT_IN.getCode());
+
+        if (null == NulsContext.LOCAL_ADDRESS_LIST || NulsContext.LOCAL_ADDRESS_LIST.isEmpty()) {
+            try {
+                Thread.sleep(5000L);
+            } catch (InterruptedException e) {
+                Log.error(e);
             }
-            info.setStatus(memberSelf.getExtend().getStatus());
+            initConsensusStatusInfo();
+            return;
+        }
+        List<Consensus<Agent>> agentList = consensusCacheManager.getCachedAgentList();
+        ConsensusStatusInfo info = new ConsensusStatusInfo();
+        for (String address : NulsContext.LOCAL_ADDRESS_LIST) {
+            if (this.seedNodeList.contains(address)) {
+                info.setAddress(address);
+                info.setStatus(ConsensusStatusEnum.IN.getCode());
+                break;
+            }
+            for (Consensus<Agent> agent : agentList) {
+                if (agent.getExtend().getDelegateAddress().equals(address)) {
+                    info.setAddress(address);
+                    info.setStatus(agent.getExtend().getStatus());
+                    if (ConsensusStatusEnum.IN.getCode() == info.getStatus()) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (info.getAddress() == null) {
+            try {
+                Thread.sleep(5000L);
+            } catch (InterruptedException e) {
+                Log.error(e);
+            }
+            return;
         }
         this.consensusStatusInfo = info;
     }
 
     public void joinMeeting() {
+        if (null == this.consensusStatusInfo) {
+            return;
+        }
         TaskManager.createAndRunThread(NulsConstant.MODULE_ID_CONSENSUS,
                 ConsensusMeetingRunner.THREAD_NAME,
                 ConsensusMeetingRunner.getInstance());
@@ -146,10 +202,6 @@ public class ConsensusManager {
         receivedTxCacheManager.clear();
     }
 
-    public String getLocalAccountAddress() {
-        return localAccountAddress;
-    }
-
     public void setCurrentRound(PocMeetingRound currentRound) {
         this.currentRound = currentRound;
 
@@ -161,5 +213,13 @@ public class ConsensusManager {
 
     public boolean isPartakePacking() {
         return partakePacking;
+    }
+
+    public void exitMeeting() {
+        TaskManager.stopThread(NulsConstant.MODULE_ID_CONSENSUS, BlockMaintenanceThread.THREAD_NAME);
+    }
+
+    public List<String> getSeedNodeList() {
+        return seedNodeList;
     }
 }

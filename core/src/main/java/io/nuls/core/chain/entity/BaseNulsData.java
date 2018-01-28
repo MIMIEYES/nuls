@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.core.chain.entity;
 
 import io.nuls.core.constant.NulsConstant;
@@ -9,6 +32,7 @@ import io.nuls.core.utils.io.NulsOutputStreamBuffer;
 import io.nuls.core.validate.DataValidatorChain;
 import io.nuls.core.validate.NulsDataValidator;
 import io.nuls.core.validate.ValidateResult;
+import io.nuls.core.validate.ValidatorManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,13 +42,11 @@ import java.io.Serializable;
  * @author Niels
  * @date 2017/10/30
  */
-public abstract class BaseNulsData implements Serializable {
+public abstract class BaseNulsData implements Serializable,Cloneable {
 
     protected NulsDataType dataType;
 
     protected NulsVersion version;
-
-    private DataValidatorChain validatorChain = new DataValidatorChain();
 
     public BaseNulsData() {
     }
@@ -38,7 +60,7 @@ public abstract class BaseNulsData implements Serializable {
     }
 
     protected void registerValidator(NulsDataValidator<? extends BaseNulsData> validator) {
-        this.validatorChain.addValidator(validator);
+        ValidatorManager.addValidator(this.getClass(),validator);
     }
 
     public abstract int size();
@@ -50,10 +72,12 @@ public abstract class BaseNulsData implements Serializable {
      */
     public final byte[] serialize() throws IOException {
         ByteArrayOutputStream bos = null;
+
         try {
-            bos = new UnsafeByteArrayOutputStream(size());
+            int size = size();
+            bos = new UnsafeByteArrayOutputStream(size);
             NulsOutputStreamBuffer buffer = new NulsOutputStreamBuffer(bos);
-            if (size() == 0) {
+            if (size == 0) {
                 bos.write(NulsConstant.PLACE_HOLDER);
             } else {
                 serializeToStream(buffer);
@@ -91,7 +115,7 @@ public abstract class BaseNulsData implements Serializable {
      * @throws NulsException
      */
     public final ValidateResult verify() {
-        return this.validatorChain.startDoValidator(this);
+        return ValidatorManager.startDoValidator(this);
     }
 
     public final void verifyWithException() throws NulsVerificationException {
@@ -124,4 +148,5 @@ public abstract class BaseNulsData implements Serializable {
     public void setVersionBy(short main, short sub) {
         version.setVersionBy(main, sub);
     }
+
 }

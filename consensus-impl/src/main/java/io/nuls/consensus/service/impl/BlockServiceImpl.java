@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.service.impl;
 
 import io.nuls.consensus.cache.manager.block.BlockCacheManager;
@@ -29,7 +52,12 @@ public class BlockServiceImpl implements io.nuls.consensus.service.intf.BlockSer
 
     @Override
     public Block getGengsisBlock() {
-        return blockStorageService.getBlock(0);
+        try {
+            return blockStorageService.getBlock(0);
+        } catch (Exception e) {
+            Log.error(e);
+        }
+        return null;
     }
 
     @Override
@@ -61,7 +89,11 @@ public class BlockServiceImpl implements io.nuls.consensus.service.intf.BlockSer
     public Block getBlock(String hash) {
         Block block = blockCacheManager.getBlock(hash);
         if (null == block) {
-            block = blockStorageService.getBlock(hash);
+            try {
+                block = blockStorageService.getBlock(hash);
+            } catch (Exception e) {
+                Log.error(e);
+            }
         }
         return block;
     }
@@ -70,15 +102,18 @@ public class BlockServiceImpl implements io.nuls.consensus.service.intf.BlockSer
     public Block getBlock(long height) {
         Block block = blockCacheManager.getBlock(height);
         if (null == block) {
-            block = blockStorageService.getBlock(height);
+            try {
+                block = blockStorageService.getBlock(height);
+            } catch (Exception e) {
+                Log.error(e);
+            }
         }
         return block;
     }
 
     @Override
     public List<Block> getBlockList(long startHeight, long endHeight) {
-        // todo auto-generated method stub(niels)
-        return null;
+        return blockStorageService.getBlockList(startHeight, endHeight);
     }
 
 
@@ -109,24 +144,23 @@ public class BlockServiceImpl implements io.nuls.consensus.service.intf.BlockSer
             return;
         }
         this.rollback(block.getTxs(), block.getTxs().size() - 1);
+        this.ledgerService.deleteTx(block.getHeader().getHeight());
         blockStorageService.delete(block.getHeader().getHash().getDigestHex());
     }
 
     @Override
-    public int getBlockCount(String address, long roundStart, long roundEnd) {
-        return this.blockStorageService.getCount(address, roundStart, roundEnd);
-    }
-
-    @Override
-    public List<NulsDigestData> getBlockHashList(long start, long end, long split) {
-        // todo auto-generated method stub(niels)
-        return null;
+    public List<NulsDigestData> getBlockHashList(long startHeight, long endHeight, long split) {
+        return blockStorageService.getBlockHashList(startHeight, endHeight, split);
     }
 
     @Override
     public BlockHeader getBlockHeader(NulsDigestData hash) {
-        // todo auto-generated method stub(niels)
-        return null;
+        String hashHex = hash.getDigestHex();
+        BlockHeader header = blockCacheManager.getBlockHeader(hashHex);
+        if (null == header) {
+            header = blockStorageService.getBlockHeader(hashHex);
+        }
+        return header;
     }
 
     private void rollback(List<Transaction> txs, int max) {

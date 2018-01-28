@@ -1,6 +1,30 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.consensus.entity.genesis;
 
 import io.nuls.consensus.constant.PocConsensusConstant;
+import io.nuls.consensus.entity.block.BlockRoundData;
 import io.nuls.consensus.utils.StringFileLoader;
 import io.nuls.core.chain.entity.*;
 import io.nuls.core.constant.ErrorCode;
@@ -14,6 +38,7 @@ import io.nuls.ledger.entity.params.Coin;
 import io.nuls.ledger.entity.params.CoinTransferData;
 import io.nuls.ledger.entity.tx.CoinBaseTransaction;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +57,9 @@ public final class GenesisBlock extends Block {
 
     private static GenesisBlock INSTANCE;
 
-    public static GenesisBlock  getInstance() {
+    private long blockTime;
+
+    public static GenesisBlock getInstance() {
         if (null == INSTANCE) {
             String json = null;
             try {
@@ -52,9 +79,14 @@ public final class GenesisBlock extends Block {
         } catch (Exception e) {
             Log.error(e);
         }
+        String time = (String) jsonMap.get(CONFIG_FILED_TIME);
+        AssertUtil.canNotEmpty(time, ErrorCode.CONFIG_ERROR);
+         blockTime = DateUtil.convertStringToDate(time).getTime();
+
         this.initGengsisTxs(jsonMap);
         this.fillHeader(jsonMap);
     }
+
     private void initGengsisTxs(Map<String, Object> jsonMap) {
         List<Map<String, Object>> list = (List<Map<String, Object>>) jsonMap.get(CONFIG_FILED_TXS);
         if (null == list || list.isEmpty()) {
@@ -89,7 +121,16 @@ public final class GenesisBlock extends Block {
             Log.error(e);
             throw new NulsRuntimeException(e);
         }
-        tx.setHash(NulsDigestData.calcDigestData(tx));
+        tx.setTime(this.blockTime);
+        tx.setFee(Na.ZERO);
+        try {
+            tx.setHash(NulsDigestData.calcDigestData(tx.serialize()));
+        } catch (IOException e) {
+            Log.error(e);
+            throw new NulsRuntimeException(e);
+        }
+        //todo
+        tx.setSign(NulsSignData.EMPTY_SIGN);
         List<Transaction> txlist = new ArrayList<>();
         txlist.add(tx);
         setTxs(txlist);
@@ -98,10 +139,8 @@ public final class GenesisBlock extends Block {
 
     private void fillHeader(Map<String, Object> jsonMap) {
         Integer height = (Integer) jsonMap.get(CONFIG_FILED_HEIGHT);
-        AssertUtil.canNotEmpty(height,ErrorCode.CONFIG_ERROR);
-        String time = (String) jsonMap.get(CONFIG_FILED_TIME);
-        AssertUtil.canNotEmpty(time,ErrorCode.CONFIG_ERROR);
-        long blockTime = DateUtil.convertStringToDate(time).getTime();
+        AssertUtil.canNotEmpty(height, ErrorCode.CONFIG_ERROR);
+
         BlockHeader header = new BlockHeader();
         this.setHeader(header);
         header.setHeight(height);
@@ -109,11 +148,25 @@ public final class GenesisBlock extends Block {
         header.setPreHash(NulsDigestData.EMPTY_HASH);
         header.setTxCount(this.getTxs().size());
         List<NulsDigestData> txHashList = new ArrayList<>();
-        for(Transaction tx:this.getTxs()){
+        for (Transaction tx : this.getTxs()) {
             txHashList.add(tx.getHash());
         }
         header.setMerkleHash(NulsDigestData.calcMerkleDigestData(txHashList));
-        header.setHash(NulsDigestData.calcDigestData(this));
+
+        BlockRoundData data = new BlockRoundData();
+        data.setRoundIndex(1);
+        data.setRoundStartTime(header.getTime());
+        data.setConsensusMemberCount(1);
+        data.setPackingIndexOfRound(1);
+        try {
+            header.setExtend(data.serialize());
+        } catch (IOException e) {
+            Log.error(e);
+        }
+        header.setPackingAddress("00000");
+        header.setHash(NulsDigestData.calcDigestData(header));
+        //todo change to real address & signature
+        header.setSign(NulsSignData.EMPTY_SIGN);
     }
 
 

@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.account.service.impl;
 
 import io.nuls.account.constant.AccountConstant;
@@ -44,9 +67,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -60,7 +81,7 @@ public class AccountServiceImpl implements AccountService {
 
     private Lock locker = new ReentrantLock();
 
-    private AccountCacheService accountCacheService;
+    private AccountCacheService accountCacheService = AccountCacheService.getInstance();
 
     private AccountDataService accountDao;
 
@@ -73,8 +94,6 @@ public class AccountServiceImpl implements AccountService {
 
     private boolean isLockNow = true;
 
-    private String Default_Account_ID;
-
     private AccountServiceImpl() {
 
     }
@@ -85,7 +104,6 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     public void init() {
-        accountCacheService = AccountCacheService.getInstance();
         accountDao = NulsContext.getInstance().getService(AccountDataService.class);
         accountAliasDBService = NulsContext.getInstance().getService(AccountAliasDataService.class);
         aliasDataService = NulsContext.getInstance().getService(AliasDataService.class);
@@ -98,8 +116,13 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public void start() {
         List<Account> accounts = getAccountList();
+        Set<String> addressList = new HashSet<>();
         if (accounts != null && !accounts.isEmpty()) {
-            Default_Account_ID = accounts.get(0).getId();
+            NulsContext.DEFAULT_ACCOUNT_ID = accounts.get(0).getAddress().getBase58();
+            for (Account account : accounts) {
+                addressList.add(account.getAddress().getBase58());
+            }
+            NulsContext.LOCAL_ADDRESS_LIST = addressList;
         }
     }
 
@@ -123,6 +146,7 @@ public class AccountServiceImpl implements AccountService {
             AccountTool.toPojo(account, po);
             this.accountDao.save(po);
             this.accountCacheService.putAccount(account);
+            NulsContext.LOCAL_ADDRESS_LIST.add(account.getAddress().getBase58());
             return account;
         } catch (Exception e) {
             Log.error(e);
@@ -151,7 +175,9 @@ public class AccountServiceImpl implements AccountService {
 
                 accounts.add(account);
                 accountPos.add(po);
-                resultList.add(account.getId());
+                resultList.add(account.getAddress().getBase58());
+
+                NulsContext.LOCAL_ADDRESS_LIST.add(account.getAddress().getBase58());
             }
 
             accountDao.save(accountPos);
@@ -168,10 +194,10 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     public Account getDefaultAccount() {
-        if (Default_Account_ID == null) {
+        if (NulsContext.DEFAULT_ACCOUNT_ID == null) {
             return null;
         }
-        return getAccount(Default_Account_ID);
+        return getAccount(NulsContext.DEFAULT_ACCOUNT_ID);
     }
 
     @Override
@@ -193,6 +219,7 @@ public class AccountServiceImpl implements AccountService {
         }
         list = new ArrayList<>();
         List<AccountPo> poList = this.accountDao.getList();
+        Set<String> addressList = new HashSet<>();
         if (null == poList || poList.isEmpty()) {
             return list;
         }
@@ -200,8 +227,10 @@ public class AccountServiceImpl implements AccountService {
             Account account = new Account();
             AccountTool.toBean(po, account);
             list.add(account);
+            addressList.add(account.getAddress().getBase58());
         }
         this.accountCacheService.putAccountList(list);
+        NulsContext.LOCAL_ADDRESS_LIST = addressList;
         return list;
     }
 
@@ -217,12 +246,13 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
-    public byte[] getPrivateKey(String address) {
+    public byte[] getPrivateKey(String address, String password) {
         AssertUtil.canNotEmpty(address, "");
         Account account = accountCacheService.getAccountByAddress(address);
         if (account == null) {
             return null;
         }
+        //todo decode by password
         return account.getEcKey().getPrivKeyBytes();
     }
 
@@ -230,11 +260,11 @@ public class AccountServiceImpl implements AccountService {
     public void setDefaultAccount(String id) {
         Account account = accountCacheService.getAccountById(id);
         if (null != account) {
-            Default_Account_ID = id;
+            NulsContext.DEFAULT_ACCOUNT_ID = id;
         } else {
             throw new NulsRuntimeException(ErrorCode.FAILED, "The account not exist,id:" + id);
         }
-        //todo 发送notice给其他模块
+        //todo send notice to other module
     }
 
     @Override
@@ -398,9 +428,7 @@ public class AccountServiceImpl implements AccountService {
         if (null == bytes || bytes.length == 0) {
             return null;
         }
-        NulsSignData data = new NulsSignData();
-        data.setSignBytes(new byte[]{1});
-        return data;
+        return NulsSignData.EMPTY_SIGN;
     }
 
     @Override
@@ -408,7 +436,7 @@ public class AccountServiceImpl implements AccountService {
         if (null == digestData) {
             return null;
         }
-        return this.signData(digestData.getDigestBytes(), account, password);
+        return this.signData(digestData.getWholeBytes(), account, password);
     }
 
     @Override
@@ -668,7 +696,7 @@ public class AccountServiceImpl implements AccountService {
     }
 
     private boolean accountExist(Account account) {
-        return accountCacheService.accountExist(account.getId());
+        return accountCacheService.accountExist(account.getAddress().getBase58());
     }
 
     private void importSave(List<Account> accounts) throws Exception {

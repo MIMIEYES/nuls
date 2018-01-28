@@ -1,3 +1,26 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017-2018 nuls.io
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package io.nuls.ledger.service.intf;
 
 import io.nuls.core.chain.entity.Na;
@@ -58,7 +81,7 @@ public interface LedgerService {
      * @param unlockTime
      * @return
      */
-    Result lock(String address, String password, Na amount, long unlockTime);
+    Result lock(String address, String password, Na amount, long unlockTime,String remark);
 
     /**
      * @param txList
@@ -73,22 +96,26 @@ public interface LedgerService {
      * @param pageSize
      * @return
      */
-    List<Transaction> getListByAddress(String address, int txType, int pageNumber, int pageSize) throws Exception;
+    List<Transaction> getTxList(String address, int txType, int pageNumber, int pageSize) throws Exception;
 
+    List<Transaction> getTxList(String address, int txType) throws Exception;
 
     /**
      * @param blockHash
      * @return
      */
-    List<Transaction> getListByBlockHash(String blockHash) throws Exception;
+    List<Transaction> getTxList(String blockHash) throws Exception;
 
-    List<Transaction> getListByHeight(long startHeight, long endHeight) throws Exception;
+    List<Transaction> getTxList(long startHeight, long endHeight) throws Exception;
 
-    List<Transaction> getListByHeight(long height) throws Exception;
+    List<Transaction> getTxList(long height) throws Exception;
 
     void rollbackTx(Transaction tx) throws NulsException;
 
     void commitTx(Transaction tx) throws NulsException;
 
     void approvalTx(Transaction tx) throws NulsException;
+
+    void deleteTx(Transaction tx);
+    void deleteTx(long blockHeight);
 }
